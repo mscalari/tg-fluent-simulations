@@ -1,0 +1,15 @@
+{
+ "n_celulas": 25600,
+ "iteracoes": 1209,
+ "tempo_s": 77.3,
+ "convergiu": true,
+ "residuos": {
+  "continuity": 3.2929e-07,
+  "x-velocity": 9.9964e-07,
+  "y-velocity": 1.1245e-07
+ },
+ "var_monitor_50": 9.261557676332188e-08,
+ "monitor_final": 0.665875980713451,
+ "xr": 1.9207016519438933,
+ "xr_h": 3.8414033038877866
+}

@@ -1,0 +1,20 @@
+{
+ "n_celulas": 1000,
+ "iteracoes": 1285,
+ "tempo_s": 54.1,
+ "convergiu": true,
+ "residuos": {
+  "continuity": 1.0262e-09,
+  "x-velocity": 6.0084e-11,
+  "y-velocity": 1.7289e-14
+ },
+ "var_monitor_50": 5.538529190829422e-08,
+ "monitor_final": 4.349999942754807,
+ "x0": 2.45,
+ "ubar": 4.34999994276,
+ "eL2": 0.27058367770189884,
+ "einf": 0.012499993200000059,
+ "fx_top": 8.99999985709225,
+ "fx_bottom": 10.99999986158892,
+ "balanco": 19.99999971868117
+}

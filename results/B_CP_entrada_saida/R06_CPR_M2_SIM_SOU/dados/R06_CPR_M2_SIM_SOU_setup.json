@@ -1,0 +1,88 @@
+{
+ "inlet": {
+  "velocity_specification_method": "Magnitude, Normal to Boundary",
+  "reference_frame": "Absolute",
+  "velocity": {
+   "option": "profile",
+   "profile_name": "cp-inlet",
+   "field_name": "u"
+  },
+  "initial_gauge_pressure": {
+   "option": "value",
+   "value": 0
+  }
+ },
+ "outlet": {
+  "option": "value",
+  "value": 0
+ },
+ "urf": {
+  "body-force": 1.0,
+  "density": 1,
+  "mom": 0.7,
+  "pressure": 0.3
+ },
+ "malha": "M2_io",
+ "zona_fluido": "geom_surface",
+ "general": {
+  "type": "pressure-based",
+  "two_dim_space": "planar",
+  "velocity_formulation": "absolute",
+  "time": "steady"
+ },
+ "viscous": "laminar",
+ "energy": false,
+ "rho": 1.0,
+ "mu": 0.1,
+ "paredes": {
+  "wall_top": {
+   "motion_bc": "Moving Wall",
+   "shear_bc": "No Slip",
+   "relative": false,
+   "rotating": false,
+   "vmag": {
+    "option": "value",
+    "value": 2.0
+   },
+   "wall_translation": [
+    1,
+    0
+   ],
+   "components": false
+  },
+  "wall_bottom": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  }
+ },
+ "methods": {
+  "p_v": "SIMPLE",
+  "grad": "least-square-cell-based",
+  "disc": {
+   "mom": "second-order-upwind",
+   "pressure": "second-order"
+  }
+ },
+ "residual": {
+  "continuity": 1e-06,
+  "x-velocity": 1e-06,
+  "y-velocity": 1e-06
+ },
+ "monitores": [
+  "rd_line_x2p5"
+ ],
+ "init": {
+  "pressure": 0,
+  "x-velocity": 0,
+  "y-velocity": 0
+ },
+ "iter_max": 3000,
+ "tempo_parede_s": 5.9,
+ "pyfluent": "0.37.2",
+ "reports_finais": {
+  "fx_top": 8.834487531312854,
+  "fx_bottom": 10.93258127839702,
+  "p_in": 19.66613400720823,
+  "p_out": 0.0
+ }
+}

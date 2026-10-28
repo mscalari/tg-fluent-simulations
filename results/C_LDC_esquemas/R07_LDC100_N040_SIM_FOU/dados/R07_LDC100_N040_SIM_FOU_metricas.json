@@ -1,0 +1,24 @@
+{
+ "n_celulas": 1600,
+ "iteracoes": 593,
+ "tempo_s": 23.9,
+ "convergiu": true,
+ "residuos": {
+  "continuity": 9.9504e-07,
+  "x-velocity": 8.2736e-08,
+  "y-velocity": 7.5384e-08
+ },
+ "var_monitor_50": 2.574063701071957e-08,
+ "monitor_final": 0.0002513670504781206,
+ "xc": 0.612494673,
+ "yc": 0.7374919348,
+ "dist_ghia": 0.0056302897780113265,
+ "u_min_vert": -0.1901003203,
+ "v_max_hor": 0.173359584,
+ "v_min_hor": -0.2422403698,
+ "u_max": 0.9173554416,
+ "ghia_du_max": 0.017966438332536083,
+ "ghia_du_rms": 0.010235705248822943,
+ "ghia_dv_max": 0.01626769552585028,
+ "ghia_dv_rms": 0.006537682308596939
+}

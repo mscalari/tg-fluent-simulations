@@ -1,0 +1,78 @@
+{
+ "periodic_dpdx": 4.0,
+ "urf": {
+  "body-force": 1.0,
+  "density": 1,
+  "mom": 0.7,
+  "pressure": 0.3
+ },
+ "malha": "M2",
+ "zona_fluido": "geom_surface",
+ "general": {
+  "type": "pressure-based",
+  "two_dim_space": "planar",
+  "velocity_formulation": "absolute",
+  "time": "steady"
+ },
+ "viscous": "laminar",
+ "energy": false,
+ "rho": 1.0,
+ "mu": 0.1,
+ "paredes": {
+  "wall_top": {
+   "motion_bc": "Moving Wall",
+   "shear_bc": "No Slip",
+   "relative": false,
+   "rotating": false,
+   "vmag": {
+    "option": "value",
+    "value": 2.0
+   },
+   "wall_translation": [
+    1,
+    0
+   ],
+   "components": false
+  },
+  "wall_bottom": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  }
+ },
+ "methods": {
+  "p_v": "SIMPLE",
+  "grad": "least-square-cell-based",
+  "disc": {
+   "mom": "first-order-upwind",
+   "pressure": "second-order"
+  }
+ },
+ "residual": {
+  "continuity": 1e-06,
+  "x-velocity": 1e-06,
+  "y-velocity": 1e-06
+ },
+ "monitores": [
+  "rd_line_x2p5"
+ ],
+ "init": {
+  "pressure": 0,
+  "x-velocity": 0,
+  "y-velocity": 0
+ },
+ "iter_max": 3000,
+ "tempo_parede_s": 54.0,
+ "pyfluent": "0.37.2",
+ "reports_finais": {
+  "fx_top": 8.999999835656183,
+  "fx_bottom": 10.99999984083748
+ },
+ "continuacoes": [
+  {
+   "iter_extra": 500,
+   "tol_monitor": 1e-06,
+   "residuo_abs": 1e-12
+  }
+ ],
+ "iter_extra": 500
+}
