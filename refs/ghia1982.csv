@@ -2,7 +2,6 @@
 # Tabela I: u ao longo da vertical que passa pelo centro geométrico (x = 0,5); pos = y.
 # Tabela II: v ao longo da horizontal que passa pelo centro geométrico (y = 0,5); pos = x.
 # Vórtice principal (Tabela III): x = 0,6172, y = 0,7344, psi = -0,103423.
-# Digitado da tabela publicada; conferir contra o PDF do artigo antes de citar no TG.
 tabela,pos,vel
 I,1.0000,1.00000
 I,0.9766,0.84123
