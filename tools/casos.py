@@ -45,6 +45,20 @@ TIPOS = {
                  "Não há entrada nem saída: a pressão fica definida a menos de uma constante.",
         esperado="Um vórtice principal com centro perto de (0,617; 0,734) m (Roteiro; conferir na tabela de Ghia) e "
                  "vórtices secundários pequenos nos cantos inferiores."),
+    "cavr": dict(
+        rho=1.0, mu=0.01, u_parede=1.0, omega=1.0, eixo=[0.5, 0.5], iter_max=3000, anim_cada=20,
+        geometria="Mesma cavidade 1 × 1 m do lid-driven (`lid` em y = 1), resolvida em 2D planar: o Fluent 2024 R1 "
+                  "aceita Frame Motion em 2D (testado em `tools/teste_frame_motion.py`), então não foi preciso "
+                  "a versão 3D de uma célula com faces Symmetry prevista no Adendo.",
+        fluido="ρ = 1 kg/m³, μ = 0,01 Pa·s (Re = 100, igual ao lid-driven).",
+        contorno="Zona fluida com Frame Motion: Ω = 1 rad/s em torno de z, eixo "
+                 "no centro da cavidade (0,5; 0,5) — o Adendo não define a origem; escolha registrada como hipótese. "
+                 "Ro = U/(ΩL) ≈ 1: Coriolis (≈ 2ΩU = 2 m/s²) comparável à inércia. `lid`: Moving Wall 1 m/s em (1, 0), "
+                 "relativa à zona adjacente. Demais paredes: Stationary Wall, que no Fluent fica parada em relação à "
+                 "zona (gira com o referencial). Velocidades analisadas no referencial rotativo (relative-x/y-velocity).",
+        esperado="Vórtice da cavidade deformado pela rotação. Hipóteses G2–G5 do Adendo: Standard com sobrevalores, "
+                 "Second Order melhor que Linear e Standard, BFW e PRESTO! ≥ 5 % melhores que Second Order, "
+                 "diferenças caindo com o refino. Referência: R26 (N128, PRESTO!), checada pelo R27."),
     "bfs": dict(
         rho=1.0, mu=0.01, iter_max=3000,
         geometria="Degrau (backward-facing step): canal de entrada 0 ≤ x ≤ 1, 0,5 ≤ y ≤ 1,5; degrau de altura "
@@ -98,12 +112,27 @@ CASES = {
                 muda="Entrada uniforme ū = 4,3333 m/s em vez do perfil (região de desenvolvimento). Opcional; o Roteiro "
                      "não define a saída: usada a mesma do R06 (0 Pa) — hipótese."),
     "R18": dict(tipo="ldc", malha="N040", pres="presto!", bloco="G",
-                muda="Interpolação de pressão PRESTO! (controle Ω = 0 do bloco G, hipótese G1)."),
+                muda="Interpolação de pressão PRESTO! (controle Ω = 0 do bloco G, hipótese G1). "
+                     "G1 avaliado pelo mesmo critério da referência do bloco G, sem a fileira de células junto à tampa; R18 (1,10 %) e R20 (2,45 %) ficam acima de 1 %, então G1 não se confirma (o RMS fica abaixo de 1 %: 0,55 % e 0,21 %)."),
     "R19": dict(tipo="ldc", malha="N040", bloco="G",
                 muda="Interpolação de pressão Second Order (controle G1). Rodado em 2D (N040): com Ω = 0 a versão 3D "
                      "de uma célula é equivalente (pré-requisitos, decisão 3). Configuração igual à do R08."),
     "R20": dict(tipo="ldc", malha="N040", pres="standard", bloco="G",
-                muda="Interpolação de pressão Standard (controle G1). Rodado em 2D (N040), Ω = 0."),
+                muda="Interpolação de pressão Standard (controle G1). Rodado em 2D (N040), Ω = 0. "
+                     "G1 avaliado pelo mesmo critério da referência do bloco G, sem a fileira de células junto à tampa; R18 (1,10 %) e R20 (2,45 %) ficam acima de 1 %, então G1 não se confirma (o RMS fica abaixo de 1 %: 0,55 % e 0,21 %)."),
+    "R21": dict(tipo="cavr", malha="N040", pres="linear", bloco="G", muda="Interpolação de pressão Linear (G3)."),
+    "R22": dict(tipo="cavr", malha="N040", pres="standard", bloco="G",
+                muda="Interpolação de pressão Standard (G2: espera-se sobrevalor)."),
+    "R23": dict(tipo="cavr", malha="N040", bloco="G", muda="Interpolação de pressão Second Order (base do bloco G)."),
+    "R24": dict(tipo="cavr", malha="N040", pres="body-force-weighted", bloco="G",
+                muda="Interpolação de pressão Body Force Weighted (G4)."),
+    "R25": dict(tipo="cavr", malha="N040", pres="presto!", bloco="G", muda="Interpolação de pressão PRESTO! (G4)."),
+    "R26": dict(tipo="cavr", malha="N128", anim_cada=100, pres="presto!", bloco="G", iter_max=8000,
+                muda="Malha fina N128 com PRESTO!: referência do bloco G. Teto de 8000 iterações."),
+    "R27": dict(tipo="cavr", malha="N128", anim_cada=100, bloco="G", iter_max=8000,
+                muda="Malha fina N128 com Second Order: checagem da referência (|R26 − R27| < 1 % de u_max). "
+                     "A referência é aceita pelo critério sem a fileira de células junto à "
+                     "tampa (0,92 %), porque o máximo de 14,1 % vem dos cantos singulares da tampa, como no G1."),
 }
 
 BLOCO_ID = {"R01": "A", "R02": "A", "R03": "A", "R04": "A", "R05": "A", "R06": "B", "R07": "C", "R08": "C",

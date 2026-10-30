@@ -1,0 +1,103 @@
+{
+ "reference_frame": {
+  "frame_motion": true,
+  "mrf_relative_to_thread": "absolute",
+  "mrf_omega": {
+   "option": "value",
+   "value": 1.0
+  },
+  "reference_frame_velocity": [
+   {
+    "option": "value",
+    "value": 0
+   },
+   {
+    "option": "value",
+    "value": 0
+   }
+  ],
+  "reference_frame_axis_origin": [
+   {
+    "option": "value",
+    "value": 0.5
+   },
+   {
+    "option": "value",
+    "value": 0.5
+   }
+  ],
+  "reference_frame_zone_motion_function": "none"
+ },
+ "urf": {
+  "body-force": 1.0,
+  "density": 1,
+  "mom": 0.7,
+  "pressure": 0.3
+ },
+ "malha": "N128",
+ "zona_fluido": "geom_surface",
+ "general": {
+  "type": "pressure-based",
+  "two_dim_space": "planar",
+  "velocity_formulation": "absolute",
+  "time": "steady"
+ },
+ "viscous": "laminar",
+ "energy": false,
+ "rho": 1.0,
+ "mu": 0.01,
+ "paredes": {
+  "lid": {
+   "motion_bc": "Moving Wall",
+   "shear_bc": "No Slip",
+   "relative": true,
+   "rotating": false,
+   "vmag": {
+    "option": "value",
+    "value": 1.0
+   },
+   "wall_translation": [
+    1,
+    0
+   ],
+   "components": false
+  },
+  "wall_left": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  },
+  "wall_right": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  },
+  "wall_bottom": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  }
+ },
+ "methods": {
+  "p_v": "SIMPLE",
+  "grad": "least-square-cell-based",
+  "disc": {
+   "mom": "second-order-upwind",
+   "pressure": "second-order"
+  }
+ },
+ "residual": {
+  "continuity": 1e-06,
+  "x-velocity": 1e-06,
+  "y-velocity": 1e-06
+ },
+ "monitores": [
+  "rd_line_x0p5"
+ ],
+ "init": {
+  "pressure": 0,
+  "x-velocity": 0,
+  "y-velocity": 0
+ },
+ "iter_max": 8000,
+ "tempo_parede_s": 283.0,
+ "pyfluent": "0.37.2",
+ "reports_finais": {}
+}

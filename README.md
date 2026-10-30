@@ -11,8 +11,9 @@ Casos cobertos:
   acoplamento pressão-velocidade e interpolação da pressão;
 - **degrau** (backward-facing step) laminar.
 
-O plano completo tem 43 execuções (R01–R43) em 8 blocos (A–H). Hoje rodam R01–R20; os blocos de
-rotação e turbulência (R21–R43) aguardam malhas e parâmetros.
+O plano completo tem 43 execuções (R01–R43) em 8 blocos (A–H). Hoje rodam R01–R27 (a cavidade
+rotativa R21–R27 roda em 2D, com Frame Motion); o duto (R28–R34) e o degrau turbulento (R35–R43)
+aguardam as malhas DU040, BFY1 e BFYW.
 
 ## Começo rápido
 
@@ -23,6 +24,7 @@ export PYTHONIOENCODING=utf-8
 .venv241/Scripts/python.exe tools/casos.py                     # confere a tabela de casos e as malhas
 .venv241/Scripts/python.exe tools/analise_caso.py --selftest   # confere as métricas (não abre o Fluent)
 bash tools/rodar_lote.sh R02                                   # roda o R02 no Fluent
+.venv241/Scripts/python.exe tools/status.py R02               # acompanha ao vivo (outro terminal)
 .venv241/Scripts/python.exe tools/analise_caso.py R02          # métricas, gráficos, registro e nota
 ```
 

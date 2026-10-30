@@ -33,17 +33,19 @@ def ler_rep(path):
     return out
 
 
-def parede_movel(st, zona, u):
-    """Define uma parede como móvel absoluta, translação em (1, 0).
+def parede_movel(st, zona, u, relativa=False):
+    """Define uma parede como móvel, translação em (1, 0).
 
     Args:
         st: Raiz ``session.settings``.
         zona (str): Nome da zona de parede.
         u (float): Velocidade da parede [m/s].
+        relativa (bool, optional): Se True, a velocidade é relativa à zona adjacente
+            (referencial rotativo); senão, absoluta. Padrão False.
     """
     w = st.setup.boundary_conditions.wall[zona].momentum
     w.motion_bc = "Moving Wall"
-    w.relative = False
+    w.relative = relativa
     w.vmag = {"option": "value", "value": u}
     w.wall_translation = [1, 0]
 
@@ -70,7 +72,7 @@ def setup(s, c):
 
     Comum a todos: malha, laminar, energia off, material ``fluido-tg``, métodos, URFs,
     resíduos absolutos de 1e-6, reports e inicialização standard com zeros. Depois aplica
-    o contorno do tipo (``cp_per``, ``cp_io``, ``ldc`` ou ``bfs``). Os valores são lidos
+    o contorno do tipo (``cp_per``, ``cp_io``, ``ldc``, ``cavr`` ou ``bfs``). Os valores são lidos
     de volta da sessão para o registro.
 
     Args:
@@ -129,6 +131,16 @@ def setup(s, c):
     elif t == "ldc":
         parede_movel(st, "lid", c["u_parede"])
         linha_monitor(st, "line_x0p5", [0.5, 0, 0], [0.5, 1, 0])
+    elif t == "cavr":
+        # Frame Motion em 2D planar (eixo z implícito); nomes lidos pela API em tools/teste_frame_motion.py.
+        rf = st.setup.cell_zone_conditions.fluid[zona].reference_frame
+        rf.frame_motion = True
+        rf.mrf_omega = {"option": "value", "value": c["omega"]}
+        rf.reference_frame_axis_origin = c["eixo"]
+        # Demais paredes ficam Stationary Wall: no Fluent, paradas em relação à zona adjacente (que gira).
+        parede_movel(st, "lid", c["u_parede"], relativa=True)
+        linha_monitor(st, "line_x0p5", [0.5, 0, 0], [0.5, 1, 0], campo="relative-x-velocity")
+        ef["reference_frame"] = rf()
     elif t == "bfs":
         st.file.read_profile(file_name=str(ROOT / "refs" / c["perfil"]))
         bc.velocity_inlet["inlet"].momentum.velocity.set_state(
@@ -199,12 +211,8 @@ def exportar(s, c):
         dict: Valores finais dos reports de força e pressão (vazio se não houver).
     """
     st = s.settings
-    # Guia, passo 14: Surfaces vazio exporta todas as células do domínio.
-    st.file.export.ascii(file_name=f"../dados/{c['nome']}_campo.csv", surface_name_list=[], delimiter="comma",
-                         location="cell-center",
-                         cell_func_domain=["pressure", "total-pressure", "velocity-magnitude", "x-velocity",
-                                           "y-velocity", "stream-function"])
-    rds =[k for k in ("fx_top", "fx_bottom", "p_in", "p_out")
+    exportar_campo(st, c, f"../dados/{c['nome']}_campo.csv")
+    rds = [k for k in ("fx_top", "fx_bottom", "p_in", "p_out")
            if k in list(st.solution.report_definitions.force.keys()) + list(st.solution.report_definitions.surface.keys())]
     finais = {}
     if rds:
@@ -212,6 +220,48 @@ def exportar(s, c):
             finais.update({k: v[0] for k, v in d.items()})
     print("REPORTS FINAIS:", finais, flush=True)
     return finais
+
+
+def exportar_campo(st, c, arquivo):
+    """Exporta o campo de todas as células (Cell Center, vírgula) para um CSV.
+
+    Args:
+        st: Raiz ``session.settings``.
+        c (dict): Parâmetros completos do caso.
+        arquivo (str): Caminho relativo ao diretório de trabalho do Fluent (``<dir>/fluent``).
+    """
+    # Guia, passo 14: Surfaces vazio exporta todas as células do domínio.
+    st.file.export.ascii(file_name=arquivo, surface_name_list=[], delimiter="comma", location="cell-center",
+                         cell_func_domain=["pressure", "total-pressure", "velocity-magnitude", "x-velocity",
+                                           "y-velocity", "stream-function"]
+                         + (["relative-x-velocity", "relative-y-velocity", "rel-velocity-magnitude"]
+                            if c["tipo"] == "cavr" else []))
+
+
+def iterar_com_quadros(s, c, rep, it):
+    """Itera em blocos de ``c["anim_cada"]`` e exporta o campo ao fim de cada bloco (quadros da animação).
+
+    Para quando o Fluent converge (o bloco termina antes do previsto) ou ao atingir ``it`` iterações.
+
+    Args:
+        s (ansys.fluent.core.session_solver.Solver): Sessão com o caso inicializado.
+        c (dict): Parâmetros completos do caso.
+        rep (Path): Report File do monitor, usado para saber a iteração atual.
+        it (int): Teto de iterações.
+    """
+    anim = c["dir"] / "dados" / "anim"
+    anim.mkdir(exist_ok=True)
+    for q in anim.glob("*_it*.csv"):  # quadros de uma tentativa anterior não podem entrar no GIF
+        q.unlink()
+    feito = 0
+    while feito < it:
+        k = min(c["anim_cada"], it - feito)
+        s.settings.solution.run_calculation.iterate(iter_count=k)
+        n = ler_rep(rep)[-1][0]
+        exportar_campo(s.settings, c, f"../dados/anim/{c['nome']}_it{n:05d}.csv")
+        if n - feito < k:  # convergiu dentro do bloco
+            break
+        feito = n
 
 
 def encerrar(s):
@@ -301,7 +351,10 @@ def run(cid):
             if ub <= 0:
                 raise RuntimeError(f"ubar negativo após {ITER_SINAL} iterações: sinal do gradiente/direção errado")
             it -= ITER_SINAL
-        s.settings.solution.run_calculation.iterate(iter_count=it)
+        if c.get("anim_cada"):
+            iterar_com_quadros(s, c, rep, it)
+        else:
+            s.settings.solution.run_calculation.iterate(iter_count=it)
         ef["tempo_parede_s"] = round(time.time() - t0, 1)
         ef["pyfluent"] = pf.__version__
         s.settings.file.write_case_data(file_name=c["nome"])

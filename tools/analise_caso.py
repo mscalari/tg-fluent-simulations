@@ -30,11 +30,19 @@ def ler_campo(path):
     Args:
         path (str | Path): Caminho do CSV.
 
+    Na cavidade rotativa (``cavr``), as colunas ``x-velocity``, ``y-velocity`` e ``velocity-magnitude``
+    passam a ser as do referencial rotativo; as absolutas ficam com o sufixo ``-abs``.
+
     Returns:
         pd.DataFrame: Uma linha por célula, com os nomes de coluna sem espaços.
     """
     df = pd.read_csv(path, skipinitialspace=True)
     df.columns = df.columns.str.strip()
+    if "relative-x-velocity" in df:
+        for k, r in (("x-velocity", "relative-x-velocity"), ("y-velocity", "relative-y-velocity"),
+                     ("velocity-magnitude", "rel-velocity-magnitude")):
+            df[k + "-abs"] = df[k]
+            df[k] = df[r]
     return df
 
 
@@ -176,7 +184,7 @@ def max_du(df, cid_ref, detalhe=False):
     du = abs(m["x-velocity"] - m["x-velocity_ref"])
     if not detalhe:
         return float(du.max())
-    tampa = m[k[1]] >= m[k[1]].max() - 1e-9
+    tampa = perto(m[k[1]], m[k[1]].max())  # tolerância de 1 mm: as coordenadas têm ruído de ~1e-6 m
     return dict(max=float(du.max()), rms=float(np.sqrt((du ** 2).mean())), max_sem_tampa=float(du[~tampa].max()))
 
 
@@ -218,7 +226,7 @@ def linha_central(df, eixo, comp):
 
     Returns:
         tuple[np.ndarray, np.ndarray]: Posição ao longo da linha (0 a 1) e a componente; na parede
-        vale 0, exceto u = 1 na tampa (y = 1).
+        vale 0, exceto u = 1 na tampa (ponta y = 1 da vertical x = 0,5).
 
     Raises:
         AssertionError: Se as duas colunas vizinhas não tiverem o mesmo número de células.
@@ -231,7 +239,7 @@ def linha_central(df, eixo, comp):
     outro = "y-coordinate" if eixo == "x-coordinate" else "x-coordinate"
     s = a[outro].to_numpy()
     f = (a[comp].to_numpy() + b[comp].to_numpy()) / 2
-    topo = 1.0 if comp == "x-velocity" else 0.0
+    topo = 1.0 if (eixo, comp) == ("x-coordinate", "x-velocity") else 0.0
     return np.r_[0.0, s, 1.0], np.r_[0.0, f, topo]
 
 
@@ -254,6 +262,57 @@ def comparar_ghia(df):
         g["erro"] = g["fluent"] - g["vel"]
         out[tab] = g
     return out
+
+
+def metricas_cavr(df, cid):
+    """Métricas do bloco G (Adendo, 3.3) contra a referência R26, no referencial rotativo.
+
+    e_L2 e e∞ usam a referência interpolada linearmente (triangulação) nos centros desta malha.
+    Overshoot e subvalor: max u − max u_ref e min u − min u_ref na linha central horizontal (y = 0,5).
+    CB = max|p(i+1) − 2p(i) + p(i−1)| / (max p − min p) na fileira de células mais próxima de y = 0,5.
+
+    Args:
+        df (pd.DataFrame): Campo lido por :func:`ler_campo`.
+        cid (str): ID da execução.
+
+    Returns:
+        dict: ``u_max``, ``cb``, ``u_max_lin``, ``u_min_lin`` e, se R26 existir e não for a própria,
+        ``eL2_u``, ``eL2_v`` [%], ``einf_u``, ``einf_v`` [m/s], ``overshoot``, ``subvalor`` [m/s];
+        com sufixo ``_R27``, os mesmos erros contra o R27 (nas rodadas N040); no R27 também ``ref_dif``
+        (max|u − u_R26| / max|V|_R26, em %), ``ref_dif_sem_tampa`` e ``ref_dif_rms``.
+    """
+    import matplotlib.tri as mtri
+    _, lin = coluna(df, "y-coordinate", 0.5)
+    p = lin["pressure"].to_numpy()
+    _, ul = linha_central(df, "y-coordinate", "x-velocity")
+    m = dict(u_max=float(np.hypot(df["x-velocity"], df["y-velocity"]).max()),
+             cb=float(np.abs(p[2:] - 2 * p[1:-1] + p[:-2]).max() / np.ptp(p)),
+             u_max_lin=float(ul.max()), u_min_lin=float(ul.min()))
+    # R26 (PRESTO!) é a referência do Adendo; contra R27 (Second Order) a comparação não favorece o PRESTO!.
+    for rid, suf in (("R26", ""), ("R27", "_R27")):
+        pr = arquivos(caso(rid))["campo"]
+        if cid in ("R26", rid) or not pr.exists():
+            continue
+        ref = ler_campo(pr)
+        tri = mtri.Triangulation(ref["x-coordinate"], ref["y-coordinate"])
+        for k, n in (("x-velocity", "u"), ("y-velocity", "v")):
+            r = mtri.LinearTriInterpolator(tri, ref[k])(df["x-coordinate"], df["y-coordinate"])
+            assert not np.ma.is_masked(r), "ponto fora da malha de referência"
+            e = df[k].to_numpy() - np.asarray(r)
+            m[f"eL2_{n}{suf}"] = float(100 * np.sqrt((e ** 2).sum() / (np.asarray(r) ** 2).sum()))
+            m[f"einf_{n}{suf}"] = float(np.abs(e).max())
+    pr = arquivos(caso("R26"))["campo"]
+    if cid == "R26" or not pr.exists():
+        return m
+    ref = ler_campo(pr)
+    _, ur = linha_central(ref, "y-coordinate", "x-velocity")
+    m.update(overshoot=float(ul.max() - ur.max()), subvalor=float(ul.min() - ur.min()))
+    if cid == "R27":
+        vref = np.hypot(ref["x-velocity"], ref["y-velocity"]).max()
+        d = max_du(df, "R26", detalhe=True)
+        m.update(ref_dif=float(100 * d["max"] / vref), ref_dif_sem_tampa=float(100 * d["max_sem_tampa"] / vref),
+                 ref_dif_rms=float(100 * d["rms"] / vref))
+    return m
 
 
 def metricas_bfs(df):
@@ -317,6 +376,8 @@ def calcular(cid):
         if cid in ("R18", "R20"):
             m["max_du_R19"] = max_du(df, "R19")
             m["du_R19"] = max_du(df, "R19", detalhe=True)
+    elif t == "cavr":
+        m.update(metricas_cavr(df, cid))
     elif t == "bfs":
         m.update(metricas_bfs(df))
     a["met"].write_text(json.dumps(m, indent=1))
@@ -446,6 +507,19 @@ def graficos(cid, m):
         for a_ in ax:
             a_.grid(alpha=0.3)
             a_.legend()
+    elif c["tipo"] == "cavr":
+        rc = arquivos(caso("R26"))["campo"]
+        for d_, lab, est in ((df, "Fluent", "-"),) + (((ler_campo(rc), "R26 (referência)", "k--"),)
+                                                      if cid != "R26" and rc.exists() else ()):
+            s, f = linha_central(d_, "y-coordinate", "x-velocity")
+            ax[0].plot(s, f, est, label=lab)
+            s, f = linha_central(d_, "x-coordinate", "y-velocity")
+            ax[1].plot(f, s, est, label=lab)
+        ax[0].set(xlabel="x [m]", ylabel="u relativo [m/s]", title="u na horizontal y = 0,5 (overshoot/subvalor)")
+        ax[1].set(xlabel="v relativo [m/s]", ylabel="y [m]", title="v na vertical x = 0,5")
+        for a_ in ax:
+            a_.grid(alpha=0.3)
+            a_.legend()
     else:
         y0 = df["y-coordinate"][df["y-coordinate"] > 0].min()
         lin = df[perto(df["y-coordinate"], y0) & (df["x-coordinate"] > 1)].sort_values("x-coordinate")
@@ -464,6 +538,57 @@ def graficos(cid, m):
     fig.tight_layout()
     out.append(a["graf"] / f"{c['nome']}_perfis.png")
     fig.savefig(out[-1], dpi=120)
+    plt.close(fig)
+    return out
+
+
+def animacao(cid):
+    """Monta o GIF da evolução do campo ao longo das iterações a partir de ``dados/anim/*.csv``.
+
+    Cada quadro: |V| em cores (escala fixa, a do campo final) e vetores normalizados (direção).
+
+    Args:
+        cid (str): ID da execução.
+
+    Returns:
+        Path | None: GIF gravado em ``graficos/``, ou None se a rodada não tem quadros.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.tri as mtri
+    from matplotlib.animation import FuncAnimation, PillowWriter
+
+    c = caso(cid)
+    a = arquivos(c)
+    quadros = sorted((c["dir"] / "dados" / "anim").glob("*_it*.csv"))
+    if not quadros:
+        return None
+    dfs = [ler_campo(q) for q in quadros]
+    x, y = dfs[0]["x-coordinate"].to_numpy(), dfs[0]["y-coordinate"].to_numpy()
+    tri = mtri.Triangulation(x, y)
+    vmax = dfs[-1]["velocity-magnitude"].max()
+    s = slice(None, None, max(1, len(x) // 900))
+    fig, ax = plt.subplots(figsize=(6.4, 5.6))
+
+    def quadro(i):
+        """Desenha o quadro ``i``.
+
+        Args:
+            i (int): Índice do quadro.
+        """
+        ax.clear()
+        d = dfs[i]
+        ax.tricontourf(tri, d["velocity-magnitude"].clip(upper=vmax), levels=np.linspace(0, vmax, 31), cmap="viridis")
+        u, v = d["x-velocity"].to_numpy(), d["y-velocity"].to_numpy()
+        mag = np.hypot(u, v) + 1e-30
+        ax.quiver(x[s], y[s], (u / mag)[s], (v / mag)[s], color="w", alpha=0.75, scale=60, width=0.0025)
+        it = int(re.search(r"_it(\d+)", quadros[i].stem).group(1))
+        ax.set(title=f"{c['nome']}\niteração {it}", xlabel="x [m]", ylabel="y [m]", aspect="equal")
+
+    anim = FuncAnimation(fig, quadro, frames=len(dfs))
+    out = a["graf"] / f"{c['nome']}_animacao.gif"
+    anim.save(out, writer=PillowWriter(fps=6))
     plt.close(fig)
     return out
 
@@ -494,6 +619,12 @@ def resumo_metricas(cid, m):
         for k in ("max_du_R08", "max_du_R19"):
             if m.get(k) is not None:
                 s += f"; {k}={m[k]:.2e} m/s ({100 * m[k] / m['u_max']:.3f}% de u_max)"
+        return s
+    if t == "cavr":
+        s = f"cb={m['cb']:.3e}"
+        for k in ("overshoot", "subvalor", "eL2_u", "eL2_v", "ref_dif"):
+            if k in m:
+                s += f"; {k}={m[k]:.4g}"
         return s
     if m.get("xr") is not None:
         return f"xr={m['xr']:.4f} m; xr_h={m['xr_h']:.3f}"
@@ -578,6 +709,20 @@ def tabela_resultados(cid, m):
             d = m["du_R19"]
             L.append(f"| max|u − u_R19| sem a fileira junto à tampa (cantos singulares) | {d['max_sem_tampa']:.2e} m/s ({100 * d['max_sem_tampa'] / m['u_max']:.3f} %) | — | diagnóstico |")
             L.append(f"| RMS de |u − u_R19| | {d['rms']:.2e} m/s ({100 * d['rms'] / m['u_max']:.3f} %) | — | diagnóstico |")
+    elif t == "cavr":
+        L += [f"| max|V| relativo no campo | {m['u_max']:.4f} m/s | — | — |",
+              f"| u máx / mín na horizontal y = 0,5 | {m['u_max_lin']:.4f} / {m['u_min_lin']:.4f} m/s | — | — |",
+              f"| Índice de checkerboard CB (fileira y ≈ 0,5) | {m['cb']:.3e} | — | comparar entre esquemas |"]
+        if "eL2_u" in m:
+            L += [f"| e_L2(u) / e_L2(v) contra R26 | {m['eL2_u']:.3f} % / {m['eL2_v']:.3f} % | — | G3: R23 < R21, R22; G4: R24, R25 ≥ 5 % abaixo de R23 |",
+                  f"| e∞(u) / e∞(v) contra R26 | {m['einf_u']:.4f} / {m['einf_v']:.4f} m/s | — | — |",
+                  f"| Overshoot / subvalor (max u − max u_R26; min u − min u_R26) | {m['overshoot']:+.4f} / {m['subvalor']:+.4f} m/s | — | G2: R22 acima dos demais |"]
+        if "eL2_u_R27" in m:
+            L.append(f"| e_L2(u) / e_L2(v) contra R27 (Second Order N128, não favorece o PRESTO!) | {m['eL2_u_R27']:.3f} % / {m['eL2_v_R27']:.3f} % | — | diagnóstico |")
+        if "ref_dif" in m:
+            L += [f"| ref_dif = max|u − u_R26| / max|V|_R26 | {m['ref_dif']:.3f} % | — | < 1 % (senão a referência não vale) |",
+                  f"| ref_dif sem a fileira junto à tampa (cantos singulares) | {m['ref_dif_sem_tampa']:.3f} % | — | diagnóstico |",
+                  f"| RMS de |u − u_R26| / max|V|_R26 | {m['ref_dif_rms']:.3f} % | — | diagnóstico |"]
     else:
         xr = (f"{m['xr']:.4f} m (x_r/h = {m['xr_h']:.3f})" if m.get("xr") is not None else
               f"> {m['xr_maior_que']:.3f} m: a bolha atravessa a saída (domínio curto)" if m.get("xr_maior_que")
@@ -682,6 +827,9 @@ def analisar(cid):
     """
     m = calcular(cid)
     pngs = graficos(cid, m)
+    gif = animacao(cid)
+    if gif:
+        pngs.append(gif)
     nota(cid, m, pngs)
     print(cid, resumo_metricas(cid, m), "| convergiu:", m["convergiu"], "| it:", m["iteracoes"])
     return m

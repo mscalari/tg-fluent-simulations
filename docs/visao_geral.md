@@ -36,10 +36,10 @@ A geometria e as malhas **não** são feitas por código: foram geradas uma vez 
 | D | `D_LDC_algoritmos` | R12–R14 | Acoplamento pressão-velocidade (SIMPLEC, PISO, Coupled) | rodável |
 | E | `E_degrau_laminar` | R15–R16 | Comprimento da saída do degrau | rodável (geometria a confirmar no MATLAB) |
 | F | `F_CP_entrada_uniforme` | R17 | Entrada uniforme (opcional) | rodável |
-| G | `G_interp_pressao` | R18–R30 | Interpolação da pressão; R18–R20 sem rotação | só R18–R20 rodáveis; R21–R30 precisam de rotação (Frame Motion) e do duto 3D |
+| G | `G_interp_pressao` | R18–R30 | Interpolação da pressão; R18–R20 sem rotação | R18–R27 rodáveis (cavidade rotativa em 2D com Frame Motion, Ω = 1 rad/s, eixo em (0,5; 0,5)); R28–R30 aguardam a malha do duto DU040 |
 | H | `H_turbulencia` | R31–R43 | Modelos de turbulência (duto 3D e degrau turbulento) | pendente (malhas e parâmetros) |
 
-A lista exata do que roda hoje é o dicionário `CASES` em `tools/casos.py` (R01–R20). O mapa completo
+A lista exata do que roda hoje é o dicionário `CASES` em `tools/casos.py` (R01–R27). O mapa completo
 das 43 execuções está no `00_admin/guia_validado_fluent2024R1.md`, seção 5.
 
 Regra do projeto: cada execução muda **uma** coisa em relação ao caso-base (R02 no CP, R08 na

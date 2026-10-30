@@ -51,6 +51,12 @@ O script já usa `.venv241` e `PYTHONIOENCODING=utf-8`. A saída de cada execuç
 `results/<bloco>/<nome>/logs/run.log`; no terminal aparece só `=== R02 hh:mm:ss ===` e
 `R02 exit=0 hh:mm:ss` (exit diferente de 0 = falhou; veja o `run.log`). Uma falha não para o lote.
 
+Para acompanhar ao vivo, em outro terminal (PowerShell ou Git Bash, na raiz do repo):
+
+```bash
+.venv241/Scripts/python.exe tools/status.py R26 R27 R21 R22 R23 R24 R25   # Ctrl+C para sair
+```
+
 Uma execução só, com a saída no terminal:
 
 ```bash
@@ -115,6 +121,7 @@ Em `results/<bloco>/<nome>/` (`<nome>` = por exemplo `R02_CPP_M2_SIM_SOU`):
 | `graficos/<nome>_campos.png` | `analise_caso.py` | Em cima: módulo da velocidade em cores com vetores de direção (e linhas de corrente na cavidade e no degrau). Embaixo: pressão. |
 | `graficos/<nome>_convergencia.png` | `analise_caso.py` | Resíduos (escala log) com a linha do critério 1e-6, e o histórico do monitor. |
 | `graficos/<nome>_perfis.png` | `analise_caso.py` | CP: perfil em x ≈ 2,5 contra a analítica e o erro ponto a ponto. Cavidade: u na vertical x ≈ 0,5 e v na horizontal y ≈ 0,5. Degrau: u na primeira linha de células acima do fundo (com o ponto de recolamento) e perfis de u em três posições. |
+| `graficos/<nome>_animacao.gif` | `analise_caso.py` | Só nas rodadas com `anim_cada` (bloco G rotativo): evolução de \|V\| e dos vetores ao longo das iterações, um quadro a cada `anim_cada` iterações (quadros em `dados/anim/`). |
 | `logs/run.log` | `rodar_lote.sh` | Tudo o que o `run_caso.py` imprimiu, incluindo `SETUP EFETIVO`, as iterações do Fluent e erros. |
 | `logs/*.trn` | Fluent | Transcrição da sessão do Fluent (o que o console do Fluent mostrou). |
 
@@ -125,6 +132,7 @@ Métricas por tipo de caso (`_metricas.json`):
 | CP periódico | `x0` (x da coluna usada), `ubar`, `eL2` [%], `einf` [m/s], `fx_top`, `fx_bottom`, `balanco` (soma das forças nas paredes); no R05, `max_du_R02` |
 | CP entrada/saída | as mesmas de perfil, mais `p_in`, `p_out`, `dp`, `fx_top`, `fx_bottom` |
 | Cavidade | `xc`, `yc` (centro do vórtice), `dist_ghia`, `u_min_vert`, `v_max_hor`, `v_min_hor`, `u_max`, `ghia_du_max`/`ghia_dv_max` (erro máximo contra Ghia nas linhas centrais); e `max_du_R08` / `max_du_R19` nas comparações entre execuções |
+| Cavidade rotativa | no referencial rotativo: `u_max`, `cb` (checkerboard), `u_max_lin`/`u_min_lin` (horizontal y = 0,5) e, contra o R26, `eL2_u`, `eL2_v` [%], `einf_u`, `einf_v`, `overshoot`, `subvalor`; no R27, `ref_dif` [% de max\|V\|] |
 | Degrau | `xr` (recolamento medido a partir do degrau, x = 1) e `xr_h` (x_r / h); se a bolha atravessa a saída, `xr_maior_que` (cota inferior) |
 
 ## 5. Como adicionar uma execução
@@ -134,12 +142,12 @@ Métricas por tipo de caso (`_metricas.json`):
 2. Acrescente uma linha em `CASES`, em `tools/casos.py`, só com o que muda em relação aos padrões:
 
    ```python
-   "R21": dict(tipo="ldc", malha="N040", pres="presto!", bloco="G",
+   "R28": dict(tipo="ldc", malha="N040", pres="presto!", bloco="G",
                muda="Texto explicando o que esta rodada testa (vai para a nota)."),
    ```
 
    Chaves possíveis: `tipo` (obrigatória), `malha` (obrigatória), `muda` (obrigatória, texto da
-   nota), `alg`, `mom`, `pres`, `urf_p`, `urf_mom`, `iter_max`, `perfil`, `uin`, `bloco`. Os valores
+   nota), `alg`, `mom`, `pres`, `urf_p`, `urf_mom`, `iter_max`, `perfil`, `uin`, `bloco`, `anim_cada` (exporta um quadro a cada N iterações e gera o GIF da evolução). Os valores
    aceitos em `alg`/`mom`/`pres` são os nomes do Fluent, por exemplo `"SIMPLEC"`, `"quick"`,
    `"presto!"`. Se o ID não estiver em `BLOCO_ID`, informe `bloco`.
 3. Se for uma física nova (outro tipo de domínio ou contorno), crie também uma entrada em `TIPOS`
