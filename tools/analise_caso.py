@@ -1,25 +1,19 @@
-"""Análise das execuções: métricas, gráficos, registro_pyfluent.csv e nota de cada rodada.
+"""Análise das execuções: métricas e gráficos de cada rodada.
 
 Uso: python tools/analise_caso.py R02 [R03 ...]   (analisa as execuções e refaz registro e notas)
      python tools/analise_caso.py --todos          (analisa todas as que têm resultado)
      python tools/analise_caso.py --selftest       (confere as métricas no CSV de referência do guia)
 """
-import csv, json, math, re, shutil, sys
+import json, math, re, sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from casos import ROOT, CASES, TIPOS, caso
 
-ADMIN = ROOT / "00_admin"
-REG_BASE = ADMIN / "registro_execucoes_v2.csv"
-REG_PYF = ADMIN / "registro_pyfluent.csv"
-VAULT = ROOT / "notas"
-FEITO, PENDENTE = "✅", "⏳"
-# Previsões do FVM 1D de 2ª ordem (guia, seção 2): ū, e_L2 [%], e∞ [m/s]
-PREVISTO = {"M1": (4.4000, 1.082, 0.0500), "M2": (4.3500, 0.271, 0.0125),
-            "M3": (4.3375, 0.068, 0.0031), "M4": (4.3344, 0.017, 0.0008)}
 GHIA_CENTRO = (0.6172, 0.7344)  # Ghia et al. (1982), Tabela III: centro do vórtice principal, Re = 100
 GHIA = pd.read_csv(ROOT / "refs" / "ghia1982.csv", comment="#")
+DRIVER = pd.read_csv(ROOT / "refs" / "bfs_driver1985.csv", comment="#")
+XR_H_EXP, XR_H_INC = 6.26, 0.10  # Driver e Seegmiller (1985), via NPARC
 
 
 # ---------------------------------------------------------------- leitura
@@ -68,12 +62,19 @@ def ler_residuos(csv_path, log_path):
             pasta entram em seguida, em ordem de nome.
 
     Returns:
-        pd.DataFrame: Colunas ``iter``, ``continuity``, ``x-velocity`` e ``y-velocity``.
+        pd.DataFrame: Coluna ``iter`` e uma coluna por equação, com os nomes do cabeçalho do Fluent.
     """
-    pat =re.compile(r"^\s+(\d+)\s+([\d.]+e[-+]\d+)\s+([\d.]+e[-+]\d+)\s+([\d.]+e[-+]\d+)\s")
+    pat = re.compile(r"^\s+(\d+)((?:\s+[\d.]+e[-+]\d+)+)")
+    cab = re.compile(r"^\s*iter\s+(continuity.*?)\s+time/iter")
     logs = [log_path] + sorted(log_path.parent.glob("continuacao*.log"))  # continuações (run_caso --continuar)
-    rows = [m.groups() for lp in logs for ln in lp.read_text(errors="replace").splitlines() if (m := pat.match(ln))]
-    res = pd.DataFrame(rows, columns=["iter", "continuity", "x-velocity", "y-velocity"]).astype(float)
+    cols, rows = ["continuity", "x-velocity", "y-velocity"], []
+    for lp in logs:
+        for ln in lp.read_text(errors="replace").splitlines():
+            if m := cab.match(ln):
+                cols = m.group(1).split()
+            elif (m := pat.match(ln)) and len(v := m.group(2).split()) == len(cols):
+                rows.append([m.group(1)] + v)
+    res = pd.DataFrame(rows, columns=["iter"] + cols).astype(float)
     res["iter"] = res["iter"].astype(int)
     res = res.drop_duplicates("iter", keep="last")
     res.to_csv(csv_path, index=False)
@@ -337,6 +338,94 @@ def metricas_bfs(df):
     return dict(xr=float(xs - 1), xr_h=float((xs - 1) / 0.5))
 
 
+def ler_parede(c, zona):
+    """Lê o CSV de uma parede exportada pelo runner.
+
+    Args:
+        c (dict): Parâmetros completos do caso.
+        zona (str): Nome da zona de parede.
+
+    Returns:
+        pd.DataFrame: Uma linha por face, com os nomes de coluna sem espaços.
+    """
+    return ler_campo(c["dir"] / "dados" / f"{c['nome']}_parede_{zona}.csv")
+
+
+def metricas_duto(c, df):
+    """Métricas do duto: |V_s|max/U_b no plano xz, Re_b, Cf e y+.
+
+    Args:
+        c (dict): Parâmetros completos do caso.
+        df (pd.DataFrame): Campo lido por :func:`ler_campo`.
+
+    Returns:
+        dict: ``ub`` (média de v por volume), ``vs_max``, ``vs_ub`` [%], ``re_b``, ``cf`` (2τ/ρU_b², com τ = 1 Pa
+        pelo balanço de forças G·A = τ·P), ``yplus_max``, ``yplus_med``.
+    """
+    vol = df["cell-volume"].to_numpy()
+    ub = float((df["y-velocity"] * vol).sum() / vol.sum())
+    vs = float(np.hypot(df["x-velocity"], df["z-velocity"]).max())
+    yp = ler_parede(c, "wall")["y-plus"]
+    return dict(ub=ub, vs_max=vs, vs_ub=100 * vs / ub, re_b=c["rho"] * ub / c["mu"], cf=2 / (c["rho"] * ub ** 2),
+                yplus_max=float(yp.max()), yplus_med=float(yp.mean()))
+
+
+def paredes_bft(c):
+    """Cf e Cp ao longo das paredes do degrau, com sinal e referência iguais aos de Driver e Seegmiller.
+
+    O sinal de τ_x é fixado pela região recolada junto à saída, onde o escoamento segue em +x.
+    O Cp é referido à pressão em x/H = −4 na parede inferior de entrada, como nos dados originais.
+
+    Args:
+        c (dict): Parâmetros completos do caso.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: Paredes do lado do degrau e oposta, com ``x``, ``cf``, ``cp``, ``yplus``.
+    """
+    q = 0.5 * c["rho"] * c["u_ref"] ** 2
+    ent = ler_parede(c, "wall_in_bottom").sort_values("x-coordinate")
+    bai = ler_parede(c, "wall_down_bottom").sort_values("x-coordinate")
+    top = ler_parede(c, "wall_top").sort_values("x-coordinate")
+    sinal = np.sign(bai["x-wall-shear"].iloc[-1])
+    pref = float(np.interp(-4, ent["x-coordinate"], ent["pressure"]))
+    lado = pd.concat([ent, bai])
+    fr = [pd.DataFrame(dict(x=d["x-coordinate"].to_numpy(), cf=(sinal * d["x-wall-shear"] / q).to_numpy(),
+                            cp=((d["pressure"] - pref) / q).to_numpy(), yplus=d["y-plus"].to_numpy()))
+          for d in (lado, top)]
+    return fr[0], fr[1]
+
+
+def metricas_bft(c, df):
+    """Métricas do degrau turbulento: x_r por τ_w, μt na camada cisalhante, y+ e erros contra Driver.
+
+    Args:
+        c (dict): Parâmetros completos do caso.
+        df (pd.DataFrame): Campo lido por :func:`ler_campo`.
+
+    Returns:
+        dict: ``xr``, ``xr_h``, ``erro_xr`` [%] contra 6,26; ``mut_max``, ``mut_mu_max``; ``yplus_max``, ``yplus_med``
+        no fundo a jusante; ``cf_rms``, ``cp_step_rms``, ``cp_top_rms``.
+    """
+    lado, top = paredes_bft(c)
+    b = lado[lado["x"] > 0]
+    x, cf = b["x"].to_numpy(), b["cf"].to_numpy()
+    j = np.where((cf[:-1] < 0) & (cf[1:] >= 0))[0]  # último negativo→positivo: ignora o vórtice de canto
+    m = dict(xr=None, xr_h=None, erro_xr=None)
+    if len(j):
+        j = j[-1]
+        xr = float(x[j] - cf[j] * (x[j + 1] - x[j]) / (cf[j + 1] - cf[j]))
+        m.update(xr=xr, xr_h=xr, erro_xr=100 * (xr - XR_H_EXP) / XR_H_EXP)
+    cam = df[(df["x-coordinate"] > 0) & (df["x-coordinate"] < 12) & (df["y-coordinate"] > 0.2) & (df["y-coordinate"] < 2.5)]
+    m.update(mut_max=float(cam["viscosity-turb"].max()), mut_mu_max=float(cam["viscosity-turb"].max() / c["mu"]),
+             yplus_max=float(b["yplus"].max()), yplus_med=float(b["yplus"].mean()))
+    for nome, serie, d, col in (("cf_rms", "cf", lado, "cf"), ("cp_step_rms", "cp_step", lado, "cp"),
+                                ("cp_top_rms", "cp_top", top, "cp")):
+        e = DRIVER[(DRIVER["serie"] == serie) & (DRIVER["pos"] > -8) & (DRIVER["pos"] < 29)]
+        d = d.sort_values("x")
+        m[nome] = float(np.sqrt(((np.interp(e["pos"], d["x"], d[col]) - e["val"]) ** 2).mean()))
+    return m
+
+
 def calcular(cid):
     """Calcula as métricas de uma execução e grava ``_metricas.json``.
 
@@ -353,11 +442,13 @@ def calcular(cid):
     res = ler_residuos(a["res"], a["log"])
     st = json.loads(a["setup"].read_text())
     ult = res.iloc[-1]
-    m = dict(n_celulas=len(df), iteracoes=int(res["iter"].max()), tempo_s=st.get("tempo_parede_s"),
-             convergiu=bool(all(ult[k] < 1e-6 for k in ("continuity", "x-velocity", "y-velocity"))),
-             residuos={k: float(ult[k]) for k in ("continuity", "x-velocity", "y-velocity")},
-             var_monitor_50=float(np.ptp(rep[-50:, 1])), monitor_final=float(rep[-1, 1]))
+    eqs = [k for k in res.columns if k != "iter"]
     t = c["tipo"]
+    # No duto a continuidade fica fora do critério: o fator de escala é ~1e-16 (ver run_caso.setup).
+    crit = [k for k in eqs if not (t == "duto" and k == "continuity")]
+    m = dict(n_celulas=len(df), iteracoes=int(res["iter"].max()), tempo_s=st.get("tempo_parede_s"),
+             convergiu=bool(all(ult[k] < 1e-6 for k in crit)), residuos={k: float(ult[k]) for k in eqs},
+             var_monitor_50=float(np.ptp(rep[-50:, 1])), monitor_final=float(rep[-1, 1]))
     if t == "cp_per":
         m.update(metricas_cp(df))
         f = st["reports_finais"]
@@ -380,6 +471,10 @@ def calcular(cid):
         m.update(metricas_cavr(df, cid))
     elif t == "bfs":
         m.update(metricas_bfs(df))
+    elif t == "duto":
+        m.update(metricas_duto(c, df))
+    elif t == "bft":
+        m.update(metricas_bft(c, df))
     a["met"].write_text(json.dumps(m, indent=1))
     return m
 
@@ -424,12 +519,14 @@ def graficos(cid, m):
     a = arquivos(c)
     a["graf"].mkdir(parents=True, exist_ok=True)
     df = ler_campo(a["campo"])
+    if c["tipo"] == "duto":  # a seção fica no plano xz: desenha z no lugar de y e o escoamento secundário como vetores
+        df = df.assign(**{"y-coordinate": df["z-coordinate"], "v-axial": df["y-velocity"], "y-velocity": df["z-velocity"]})
     x, y = df["x-coordinate"].to_numpy(), df["y-coordinate"].to_numpy()
     u, v = df["x-velocity"].to_numpy(), df["y-velocity"].to_numpy()
     tri = mtri.Triangulation(x, y)
-    if c["tipo"] == "bfs":  # remove triângulos que atravessam o degrau (região sólida x < 1, y < 0,5)
+    if c["tipo"] in ("bfs", "bft"):  # remove triângulos que atravessam o degrau (a região sólida)
         cx, cy = x[tri.triangles].mean(1), y[tri.triangles].mean(1)
-        tri.set_mask((cx < 1) & (cy < 0.5))
+        tri.set_mask((cx < 1) & (cy < 0.5) if c["tipo"] == "bfs" else (cx < 0) & (cy < 1))
     lx, ly = np.ptp(x), np.ptp(y)
     larg = 11 if lx / ly < 3 else 14
     alt = larg * ly / lx * 2.4 + 1.2 if lx / ly < 3 else larg * ly / lx * 2 + 2
@@ -461,13 +558,15 @@ def graficos(cid, m):
     res = ler_residuos(a["res"], a["log"])
     rep = ler_rep(a["rep"])
     fig, ax = plt.subplots(1, 2, figsize=(12, 4.5))
-    for k in ("continuity", "x-velocity", "y-velocity"):
-        ax[0].semilogy(res["iter"], res[k], label=k)
+    for k in res.columns.drop("iter"):
+        ax[0].semilogy(res["iter"], res[k].clip(lower=1e-20), label=k)
     ax[0].axhline(1e-6, color="k", ls="--", lw=0.8, label="critério 1e-6")
     ax[0].set(xlabel="iteração", ylabel="resíduo absoluto", title="Resíduos")
     ax[0].legend()
     ax[1].plot(rep[:, 0], rep[:, 1])
-    ax[1].set(xlabel="iteração", ylabel="u médio na linha [m/s]", title="Monitor (média de u na linha de medição)")
+    mon = {"duto": "v médio na linha z = 0 [m/s]", "bft": "τ_x médio em wall_down_bottom [Pa]"}.get(c["tipo"])
+    ax[1].set(xlabel="iteração", ylabel=mon or "u médio na linha [m/s]",
+              title="Monitor" if mon else "Monitor (média de u na linha de medição)")
     if c["tipo"] == "cp_per":
         ax[1].axhline(4.3333, color="k", ls="--", lw=0.8, label="ū analítico 4,3333")
         ax[1].legend()
@@ -517,6 +616,34 @@ def graficos(cid, m):
             ax[1].plot(f, s, est, label=lab)
         ax[0].set(xlabel="x [m]", ylabel="u relativo [m/s]", title="u na horizontal y = 0,5 (overshoot/subvalor)")
         ax[1].set(xlabel="v relativo [m/s]", ylabel="y [m]", title="v na vertical x = 0,5")
+        for a_ in ax:
+            a_.grid(alpha=0.3)
+            a_.legend()
+    elif c["tipo"] == "duto":
+        lin = df[perto(df["y-coordinate"], df["y-coordinate"].abs().min(), 1e-6 + 1e-3)].sort_values("x-coordinate")
+        ax[0].plot(lin["x-coordinate"], lin["v-axial"], ".-")
+        ax[0].set(xlabel="x [m]", ylabel="v [m/s]", title=f"Velocidade axial em z ≈ 0 (U_b = {m['ub']:.3f} m/s)")
+        dg = df.assign(s=(df["x-coordinate"] - df["y-coordinate"]).abs()).nsmallest(40, "s").sort_values("x-coordinate")
+        ax[1].plot(dg["x-coordinate"], 100 * np.hypot(dg["x-velocity"], dg["y-velocity"]) / m["ub"], ".-")
+        ax[1].set(xlabel="x na diagonal [m]", ylabel="|V_s|/U_b [%]",
+                  title=f"Escoamento secundário na diagonal (max no campo = {m['vs_ub']:.3g} %)")
+        for a_ in ax:
+            a_.grid(alpha=0.3)
+    elif c["tipo"] == "bft":
+        lado, top = paredes_bft(c)
+        lado, top = lado.sort_values("x"), top.sort_values("x")
+        ex = DRIVER.set_index("serie")
+        ax[0].plot(lado["x"], lado["cf"], label="Fluent")
+        ax[0].errorbar(ex.loc["cf", "pos"], ex.loc["cf", "val"], yerr=abs(ex.loc["cf", "val"] * ex.loc["cf", "dcf_rel"]),
+                       fmt="ks", mfc="none", ms=4, label="Driver e Seegmiller (1985)")
+        ax[0].axhline(0, color="k", lw=0.5)
+        ax[0].set(xlim=(-8, 30), ylim=(-0.004, 0.006), xlabel="x/H", ylabel="Cf",
+                  title=f"Cf na parede do degrau (x_r/H = {m['xr_h'] if m['xr_h'] is None else round(m['xr_h'], 3)}; exp. 6,26)")
+        ax[1].plot(lado["x"], lado["cp"], label="Fluent, lado do degrau")
+        ax[1].plot(top["x"], top["cp"], label="Fluent, parede oposta")
+        ax[1].plot(ex.loc["cp_step", "pos"], ex.loc["cp_step", "val"], "ks", mfc="none", ms=4, label="Exp., lado do degrau")
+        ax[1].plot(ex.loc["cp_top", "pos"], ex.loc["cp_top", "val"], "k^", mfc="none", ms=4, label="Exp., parede oposta")
+        ax[1].set(xlim=(-8, 30), xlabel="x/H", ylabel="Cp (ref. x/H = −4)", title="Coeficiente de pressão")
         for a_ in ax:
             a_.grid(alpha=0.3)
             a_.legend()
@@ -593,7 +720,7 @@ def animacao(cid):
     return out
 
 
-# ---------------------------------------------------------------- registro e notas
+# ---------------------------------------------------------------- resumo
 
 def resumo_metricas(cid, m):
     """Texto ``nome=valor`` para a coluna ``Metrica_integral`` do registro.
@@ -626,198 +753,19 @@ def resumo_metricas(cid, m):
             if k in m:
                 s += f"; {k}={m[k]:.4g}"
         return s
+    if t == "duto":
+        return (f"ub={m['ub']:.4f} m/s; vs_ub={m['vs_ub']:.4g} %; Re_b={m['re_b']:.0f}; Cf={m['cf']:.3e}; "
+                f"y+max={m['yplus_max']:.2f}")
+    if t == "bft" and m.get("xr") is not None:
+        return (f"xr_h={m['xr_h']:.3f}; erro={m['erro_xr']:+.1f}%; mut/mu_max={m['mut_mu_max']:.0f}; y+max={m['yplus_max']:.2f}; "
+                f"Cf_rms={m['cf_rms']:.2e}; Cp_rms(degrau/oposta)={m['cp_step_rms']:.3f}/{m['cp_top_rms']:.3f}")
     if m.get("xr") is not None:
         return f"xr={m['xr']:.4f} m; xr_h={m['xr_h']:.3f}"
     return f"xr>{m['xr_maior_que']:.3f} m (bolha atravessa a saida)" if m.get("xr_maior_que") else "xr=nao encontrado"
 
 
-def registrar():
-    """Reescreve ``registro_pyfluent.csv`` com as 43 execuções e o status na 1ª coluna.
-
-    Parte das linhas planejadas em ``registro_execucoes_v2.csv`` (o original não é alterado)
-    e preenche os resultados das execuções que têm ``_metricas.json``. Status: ✅ feito, ⏳ pendente.
-    """
-    linhas = list(csv.DictReader(open(REG_BASE, encoding="utf-8"), delimiter=";"))
-    campos = ["Status"] + list(linhas[0].keys())
-    for r in linhas:
-        cid = r["ID"]
-        met = arquivos(caso(cid))["met"] if cid in CASES else None
-        if not (met and met.exists()):
-            r["Status"] = PENDENTE
-            continue
-        m = json.loads(met.read_text())
-        c = caso(cid)
-        st = json.loads(arquivos(c)["setup"].read_text())
-        urf = st.get("urf", {})
-        r.update(Status=FEITO, Convergiu_S_N="S" if m["convergiu"] else "N", Iteracoes=str(m["iteracoes"]),
-                 Tempo_parede_s=str(m["tempo_s"]), URF_p=str(urf.get("pressure", "padrao Coupled")),
-                 URF_mom=str(urf.get("mom", "padrao Coupled")),
-                 Arquivos_gerados=f"results/{c['dir'].parent.name}/{c['nome']}/",
-                 eL2_rel=f"{m['eL2']:.4f}%" if "eL2" in m else "", eInf=f"{m['einf']:.5f} m/s" if "einf" in m else "",
-                 Metrica_integral=resumo_metricas(cid, m),
-                 Obs=f"PyFluent {st.get('pyfluent')} + Fluent 2024 R1, serial 2ddp sem GUI. Malha {c['malha']}. "
-                     "Residuos finais: " + ", ".join(f"{k}={v:.3e}" for k, v in m["residuos"].items()))
-    with open(REG_PYF, "w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, campos, delimiter=";")
-        w.writeheader()
-        w.writerows(linhas)
-
-
-def tabela_resultados(cid, m):
-    """Linhas Markdown de resultado × esperado × critério para a nota da rodada.
-
-    Args:
-        cid (str): ID da execução.
-        m (dict): Métricas de :func:`calcular`.
-
-    Returns:
-        list[str]: Linhas da tabela (sem cabeçalho).
-    """
-    c = caso(cid)
-    t = c["tipo"]
-    L = []
-    if t == "cp_per":
-        pu, pe, pi = PREVISTO[c["malha"]]
-        L += [f"| ū (média das células em x = {m['x0']:.3f}) | {m['ubar']:.5f} m/s | FVM 1D: {pu} (analítico 4,3333) | ±0,5 % do analítico |",
-              f"| e_L2 = ‖u−uₐ‖₂/‖uₐ‖₂ | {m['eL2']:.4f} % | FVM 1D: {pe} % | ≤ 0,5 % na M2 |",
-              f"| e∞ = max|u−uₐ| | {m['einf']:.5f} m/s | FVM 1D: {pi} | — |",
-              f"| Fx na parede móvel (`wall_top`) | {m['fx_top']:.4f} N/m | ±9 N/m | — |",
-              f"| Fx na parede parada (`wall_bottom`) | {m['fx_bottom']:.4f} N/m | ±11 N/m | — |",
-              f"| Soma das forças nas paredes | {m['balanco']:.4f} N/m | ±20 N/m (= G·L·H) | — |"]
-        if "max_du_R02" in m:
-            L.append(f"| max|u_R05 − u_R02| (célula a célula) | {m['max_du_R02']:.2e} m/s | ≈ 0 | < 1e-4 m/s |")
-        if cid in ("R01", "R02", "R03", "R04"):
-            for k, p in ordem_observada().items():
-                if cid in k:
-                    L.append(f"| Ordem observada p ({k}) | {p:.3f} | 2 | entre 1,8 e 2,2 |")
-    elif t == "cp_io":
-        L += [f"| Δp = p_entrada − p_saída (média por área) | {m['dp']:.4f} Pa | 20 Pa | ±1 % |",
-              f"| ū em x = {m['x0']:.3f} | {m['ubar']:.5f} m/s | 4,3333 | — |",
-              f"| e_L2 em x = {m['x0']:.3f} | {m['eL2']:.4f} % | — | — |",
-              f"| e∞ em x = {m['x0']:.3f} | {m['einf']:.5f} m/s | — | — |"]
-    elif t == "ldc":
-        L += [f"| Centro do vórtice (célula de max|ψ − ψ_parede|) | ({m['xc']:.4f}; {m['yc']:.4f}) m | ≈ (0,617; 0,734) | distância {m['dist_ghia']:.4f} m (≤ 1 célula = {1 / math.sqrt(m['n_celulas']):.4f} m) |",
-              f"| u mínimo na coluna mais próxima de x = 0,5 | {m['u_min_vert']:.4f} m/s | −0,2109 (Ghia, ponto y = 0,4531) | — |",
-              f"| v máx / mín na linha mais próxima de y = 0,5 | {m['v_max_hor']:.4f} / {m['v_min_hor']:.4f} m/s | 0,1753 / −0,2453 (Ghia, nos pontos da tabela) | — |",
-              f"| max|Δu| nos 15 pontos internos da Tabela I de Ghia (RMS) | {m['ghia_du_max']:.4f} m/s ({m['ghia_du_rms']:.4f}) | 0 | ≤ 0,02 m/s |",
-              f"| max|Δv| nos 15 pontos internos da Tabela II de Ghia (RMS) | {m['ghia_dv_max']:.4f} m/s ({m['ghia_dv_rms']:.4f}) | 0 | ≤ 0,02 m/s |"]
-        if m.get("max_du_R08") is not None:
-            crit = "< 1e-4 m/s" if cid in ("R12", "R13", "R14") else "< 1 % de u_max (G1)"
-            L.append(f"| max|u − u_R08| | {m['max_du_R08']:.2e} m/s ({100 * m['max_du_R08'] / m['u_max']:.3f} % de u_max) | ≈ 0 | {crit} |")
-        if m.get("max_du_R19") is not None:
-            L.append(f"| max|u − u_R19| (G1) | {m['max_du_R19']:.2e} m/s ({100 * m['max_du_R19'] / m['u_max']:.3f} % de u_max) | ≈ 0 | < 1 % de u_max |")
-            d = m["du_R19"]
-            L.append(f"| max|u − u_R19| sem a fileira junto à tampa (cantos singulares) | {d['max_sem_tampa']:.2e} m/s ({100 * d['max_sem_tampa'] / m['u_max']:.3f} %) | — | diagnóstico |")
-            L.append(f"| RMS de |u − u_R19| | {d['rms']:.2e} m/s ({100 * d['rms'] / m['u_max']:.3f} %) | — | diagnóstico |")
-    elif t == "cavr":
-        L += [f"| max|V| relativo no campo | {m['u_max']:.4f} m/s | — | — |",
-              f"| u máx / mín na horizontal y = 0,5 | {m['u_max_lin']:.4f} / {m['u_min_lin']:.4f} m/s | — | — |",
-              f"| Índice de checkerboard CB (fileira y ≈ 0,5) | {m['cb']:.3e} | — | comparar entre esquemas |"]
-        if "eL2_u" in m:
-            L += [f"| e_L2(u) / e_L2(v) contra R26 | {m['eL2_u']:.3f} % / {m['eL2_v']:.3f} % | — | G3: R23 < R21, R22; G4: R24, R25 ≥ 5 % abaixo de R23 |",
-                  f"| e∞(u) / e∞(v) contra R26 | {m['einf_u']:.4f} / {m['einf_v']:.4f} m/s | — | — |",
-                  f"| Overshoot / subvalor (max u − max u_R26; min u − min u_R26) | {m['overshoot']:+.4f} / {m['subvalor']:+.4f} m/s | — | G2: R22 acima dos demais |"]
-        if "eL2_u_R27" in m:
-            L.append(f"| e_L2(u) / e_L2(v) contra R27 (Second Order N128, não favorece o PRESTO!) | {m['eL2_u_R27']:.3f} % / {m['eL2_v_R27']:.3f} % | — | diagnóstico |")
-        if "ref_dif" in m:
-            L += [f"| ref_dif = max|u − u_R26| / max|V|_R26 | {m['ref_dif']:.3f} % | — | < 1 % (senão a referência não vale) |",
-                  f"| ref_dif sem a fileira junto à tampa (cantos singulares) | {m['ref_dif_sem_tampa']:.3f} % | — | diagnóstico |",
-                  f"| RMS de |u − u_R26| / max|V|_R26 | {m['ref_dif_rms']:.3f} % | — | diagnóstico |"]
-    else:
-        xr = (f"{m['xr']:.4f} m (x_r/h = {m['xr_h']:.3f})" if m.get("xr") is not None else
-              f"> {m['xr_maior_que']:.3f} m: a bolha atravessa a saída (domínio curto)" if m.get("xr_maior_que")
-              else "não encontrado")
-        L.append(f"| Comprimento de recolamento x_r | {xr} | o Roteiro não informa | — |")
-    # Barras dentro das células (|Δu|, max|ψ|) quebram a tabela Markdown: escapa célula a célula.
-    return ["| " + " | ".join(x.replace("|", "\\|") for x in l[2:-2].split(" | ")) + " |" for l in L]
-
-
-def nota(cid, m, pngs):
-    """Escreve a nota Markdown da rodada em ``notas/`` e copia os gráficos.
-
-    Args:
-        cid (str): ID da execução.
-        m (dict): Métricas de :func:`calcular`.
-        pngs (list[Path]): Gráficos gerados por :func:`graficos`.
-
-    Returns:
-        Path: Caminho da nota.
-    """
-    c = caso(cid)
-    tp = TIPOS[c["tipo"]]
-    st = json.loads(arquivos(c)["setup"].read_text())
-    img = VAULT / "img"
-    img.mkdir(parents=True, exist_ok=True)
-    for p in pngs:
-        shutil.copy(p, img / p.name)
-    nomes_esq = {"first-order-upwind": "First Order Upwind (FOU)", "second-order-upwind": "Second Order Upwind (SOU)",
-                 "quick": "QUICK", "third-order-muscl": "MUSCL (3ª ordem)", "second-order": "Second Order",
-                 "standard": "Standard", "presto!": "PRESTO!"}
-    urf = st.get("urf")
-    urf_txt = f"pressão {urf['pressure']}, momento {urf['mom']}" if urf else "não se aplica (Coupled usa os padrões próprios)"
-    mov = {k: v for k, v in st["paredes"].items() if v.get("motion_bc") == "Moving Wall"}
-    cont = "".join(
-        f"\n- **Desvio do protocolo (continuação):** +{x['iter_extra']} iterações a partir do .cas/.dat"
-        + (f", com o corte por resíduo desligado (1e-12) até o monitor variar menos de {x['tol_monitor']:g} m/s em "
-           "50 iterações (2ª metade do critério do guia: monitor estável)" if x.get("tol_monitor") else
-           f", com o mesmo critério de resíduo ({x['residuo_abs']:g})")
-        for x in st.get("continuacoes", []))
-    txt = f"""# {cid} · {c['nome']}
-
-**Status:** {FEITO} feito · **Bloco:** {c['dir'].parent.name} · **Convergiu:** {'sim' if m['convergiu'] else 'NÃO'} em {m['iteracoes']} iterações · **Tempo de parede:** {m['tempo_s']} s
-
-## O que esta rodada testa
-{c['muda']}
-
-## Parâmetros de entrada
-**Geometria.** {tp['geometria']}
-
-**Malha.** `mesh/{c['malha']}.msh`, {m['n_celulas']} células quadriláteras.
-
-**Fluido.** {tp['fluido']} Material `fluido-tg` (cópia do ar com ρ e μ trocados), atribuído à zona `{st['zona_fluido']}`.
-
-**Condições de contorno.** {tp['contorno']}
-
-**Modelo.** Pressure-based, regime permanente, 2D planar, laminar, sem equação de energia.
-
-**Solver.**
-- Acoplamento pressão-velocidade: **{st['methods']['p_v']}**
-- Gradiente: Least Squares Cell Based
-- Interpolação de pressão: **{nomes_esq.get(st['methods']['disc']['pressure'], st['methods']['disc']['pressure'])}**
-- Momento: **{nomes_esq.get(st['methods']['disc']['mom'], st['methods']['disc']['mom'])}**
-- Sub-relaxação (URF): {urf_txt}
-- Critério de parada: resíduos absolutos < 1e-6 em continuity, x-velocity e y-velocity; teto de {st['iter_max']} iterações
-- Inicialização: standard, velocidade e pressão nulas (igual em todas as rodadas){cont}
-
-**Paredes móveis (lidas de volta do Fluent).** {', '.join(f"`{k}`: {v['vmag']['value']} m/s em {v['wall_translation']}, relativa={v['relative']}" for k, v in mov.items()) or 'nenhuma'}
-
-**Monitor de convergência.** {', '.join(st['monitores'])} (média de u por área na linha de medição).
-
-## O que se espera
-{tp['esperado']}
-
-## Resultados
-| Grandeza | Fluent | Esperado | Critério |
-|---|---|---|---|
-""" + "\n".join(tabela_resultados(cid, m)) + f"""
-
-Resíduos finais: {', '.join(f"{k} = {v:.3e}" for k, v in m['residuos'].items())}. Variação do monitor nas últimas 50 iterações: {m['var_monitor_50']:.2e} m/s.
-
-## Gráficos
-""" + "\n".join(f"![[{p.name}]]" for p in pngs) + f"""
-
-## Arquivos
-`results/{c['dir'].parent.name}/{c['nome']}/` com `fluent/` (.cas.h5, .dat.h5), `dados/` (campo, rep.out, resíduos, setup.json, métricas.json), `graficos/` e `logs/`.
-
-Gerado por `tools/analise_caso.py`.
-"""
-    p = VAULT / f"{c['nome']}.md"
-    p.write_text(txt, encoding="utf-8")
-    return p
-
-
 def analisar(cid):
-    """Analisa uma execução: métricas, gráficos e nota.
+    """Analisa uma execução: métricas, gráficos e animação.
 
     Args:
         cid (str): ID da execução.
@@ -826,11 +774,8 @@ def analisar(cid):
         dict: Métricas de :func:`calcular`.
     """
     m = calcular(cid)
-    pngs = graficos(cid, m)
-    gif = animacao(cid)
-    if gif:
-        pngs.append(gif)
-    nota(cid, m, pngs)
+    graficos(cid, m)
+    animacao(cid)
     print(cid, resumo_metricas(cid, m), "| convergiu:", m["convergiu"], "| it:", m["iteracoes"])
     return m
 
@@ -841,9 +786,13 @@ def selftest():
     Raises:
         AssertionError: Se ū, e_L2 ou e∞ divergirem do guia.
     """
-    m = metricas_cp(ler_campo(ROOT / "refs" / "r02cpp_m2_sim_sou_campo.csv"))
-    assert abs(m["ubar"] - 4.3499) < 5e-5 and abs(m["eL2"] - 0.2693) < 5e-5 and abs(m["einf"] - 0.01249) < 5e-6, m
     assert GHIA.groupby("tabela").size().to_dict() == {"I": 17, "II": 17}, "ghia1982.csv incompleto"
+    ref = ROOT / "refs" / "r02cpp_m2_sim_sou_campo.csv"
+    if not ref.exists():
+        print("selftest parcial: CSV de referência do R02 ausente")
+        return
+    m = metricas_cp(ler_campo(ref))
+    assert abs(m["ubar"] - 4.3499) < 5e-5 and abs(m["eL2"] - 0.2693) < 5e-5 and abs(m["einf"] - 0.01249) < 5e-6, m
     print("selftest ok:", m)
 
 
@@ -857,5 +806,3 @@ if __name__ == "__main__":
             calcular(k)
         for k in ids:
             analisar(k)
-        registrar()
-        print("registro:", REG_PYF)

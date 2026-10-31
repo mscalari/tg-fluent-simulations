@@ -48,7 +48,7 @@ TIPOS = {
     "cavr": dict(
         rho=1.0, mu=0.01, u_parede=1.0, omega=1.0, eixo=[0.5, 0.5], iter_max=3000, anim_cada=20,
         geometria="Mesma cavidade 1 × 1 m do lid-driven (`lid` em y = 1), resolvida em 2D planar: o Fluent 2024 R1 "
-                  "aceita Frame Motion em 2D (testado em `tools/teste_frame_motion.py`), então não foi preciso "
+                  "aceita Frame Motion em 2D (testado), então não foi preciso "
                   "a versão 3D de uma célula com faces Symmetry prevista no Adendo.",
         fluido="ρ = 1 kg/m³, μ = 0,01 Pa·s (Re = 100, igual ao lid-driven).",
         contorno="Zona fluida com Frame Motion: Ω = 1 rad/s em torno de z, eixo "
@@ -72,7 +72,44 @@ TIPOS = {
         esperado="Bolha de recirculação atrás do degrau; x_r = comprimento de recolamento medido a partir do degrau "
                  "(x = 1) pela troca de sinal de u na primeira linha de células acima de `wall_down_bottom`. "
                  "O Roteiro não traz o x_r esperado."),
+    "duto": dict(
+        dim=3, rho=1.0, mu=1 / 300, dpdy=4.0, iter_max=30000, paredes=("wall",),
+        ini={"k": 3.33, "epsilon": 14.0, "omega": 47.0},
+        geometria="Duto quadrado de lado 2h = 1 m (x, z ∈ [−0,5; 0,5]), trecho de 0,1 m em y com uma célula: "
+                  "escoamento plenamente desenvolvido em y, seção no plano xz. `periodic_a` em y = 0 e `periodic_b` "
+                  "em y = 0,1 viram um par periódico; `wall` são as quatro faces laterais.",
+        fluido="ρ = 1 kg/m³, μ = 1/300 = 3,333e-3 Pa·s. Alvo Re_τ = ρu_τh/μ = 150 com u_τ = 1 m/s e h = 0,5 m; "
+               "DNS de Gavrilakis (1992): Re_b = ρU_bD/μ ≈ 4410 (U_b ≈ 14,7 m/s).",
+        contorno="Periodicidade com gradiente imposto de 4 Pa/m em +y (G = 2ρu_τ²/h). Na TUI: "
+                 "`pressure-gradient-specification 4 0 -1 0` (como no CP, com direção +1 o escoamento sai negativo; "
+                 "o sinal é checado após 50 iterações). Paredes paradas "
+                 "sem escorregamento. Inicialização: velocidade nula, k = 3,33 m²/s², ε = 14, ω = 47 (k ≈ u_τ²/0,3 e "
+                 "ℓ = 0,07 D), iguais em todas as rodadas.",
+        esperado="Modelos de Boussinesq (k-ε, SST) sem escoamento secundário real; RSM com |V_s|max/U_b da ordem de "
+                 "1–2 % (DNS, Pirozzoli et al., 2018). Cf de referência 9,38e-3 em Re_b = 4410 (só ordem de grandeza)."),
+    "bft": dict(
+        rho=1.0, mu=1 / 36000, u_ref=1.0, iter_max=20000, I=0.05, mut_mu=10.0, perfil="bfy_inlet.prof",
+        paredes=("wall_down_bottom", "wall_in_bottom", "wall_top", "wall_step"),
+        ini={"x-velocity": 1.0, "k": 3.75e-3, "omega": 13.5, "epsilon": 4.56e-3},
+        geometria="Degrau de Driver e Seegmiller (1985) com parede superior reta, H = 1 m: canal de entrada −10 ≤ x ≤ 0, "
+                  "1 ≤ y ≤ 9; jusante 0 ≤ x ≤ 30, 0 ≤ y ≤ 9. Razão de expansão 9/8 = 1,125.",
+        fluido="ρ = 1 kg/m³, U_ref = 1 m/s, μ = 1/36 000 = 2,778e-5 Pa·s, Re_H = 36 000 (NASA TMR).",
+        contorno="`inlet` (x = −10): perfil de `refs/bfy_inlet.prof` (lei 1/7 nas duas paredes, δ = 1,4H, U = 1 no núcleo), "
+                 "I = 5 %, μt/μ = 10. `outlet`: Pressure Outlet 0 Pa, mesma turbulência em retorno. Demais: paredes paradas. "
+                 "Inicialização: u = 1 m/s, k = 3,75e-3, ω = 13,5, ε = 4,56e-3, coerentes com a entrada.",
+        esperado="Bolha atrás do degrau; experimento: x_r/H = 6,26 ± 0,10. O perfil de entrada não é o medido em x/H = −4, "
+                 "então a comparação entre modelos vale mais que o valor absoluto de x_r."),
 }
+
+# k-ε e RSM com Enhanced Wall Treatment (o padrão do Fluent é função de parede, inválida com
+# y+ ≈ 1); modelos de ω integram até a parede. Equações de turbulência em SOU, como o momento.
+KES = dict(model="k-epsilon", k_epsilon_model="standard")
+REAL = dict(model="k-epsilon", k_epsilon_model="realizable")
+RNG = dict(model="k-epsilon", k_epsilon_model="rng")
+SST = dict(model="k-omega", k_omega_model="sst")
+BSL = dict(model="k-omega", k_omega_model="bsl")
+GEKO = dict(model="k-omega", k_omega_model="geko")
+RSM = dict(model="reynolds-stress", reynolds_stress_model="rsm-linear-pressure-strain")
 
 # Padrões comuns: SIMPLE, LSQ cell based, pressão de 2ª ordem, momento SOU, URF 0,3/0,7, resíduos 1e-6.
 BASE = dict(alg="SIMPLE", mom="second-order-upwind", pres="second-order", urf_p=0.3, urf_mom=0.7)
@@ -133,11 +170,53 @@ CASES = {
                 muda="Malha fina N128 com Second Order: checagem da referência (|R26 − R27| < 1 % de u_max). "
                      "A referência é aceita pelo critério sem a fileira de células junto à "
                      "tampa (0,92 %), porque o máximo de 14,1 % vem dos cantos singulares da tampa, como no G1."),
+    "R28": dict(tipo="duto", malha="DU040", turb=SST, bloco="G",
+                muda="Pressão Second Order com SST (G6). Configuração idêntica à do R32: serve de teste de repetibilidade."),
+    "R29": dict(tipo="duto", malha="DU040", turb=SST, pres="standard", bloco="G", muda="Pressão Standard com SST (G6)."),
+    "R30": dict(tipo="duto", malha="DU040", turb=SST, pres="presto!", bloco="G", muda="Pressão PRESTO! com SST (G6)."),
+    "R31": dict(tipo="duto", malha="DU040", turb=KES, bloco="H", muda="k-ε Standard com Enhanced Wall Treatment (T1)."),
+    "R32": dict(tipo="duto", malha="DU040", turb=SST, bloco="H", muda="k-ω SST: linha de base de ruído (T1)."),
+    "R33": dict(tipo="duto", malha="DU040", turb=RSM, bloco="H",
+                muda="RSM linear com EWT (T1). Desvio do Adendo: o padrão do RSM é função de parede, inválida com y+ ≈ 1."),
+    "R34": dict(tipo="duto", malha="DU040", turb=SST, canto=True, bloco="H", muda="SST com Corner Flow Correction (T2)."),
+    "R35": dict(tipo="bft", malha="BFY1", turb=KES, bloco="H", muda="k-ε Standard com EWT (T3)."),
+    "R36": dict(tipo="bft", malha="BFY1", turb=REAL, bloco="H",
+                muda="k-ε Realizable com EWT (T5). Termo de rotação de Cμ desligado: padrão confirmado na sessão viva "
+                     "(`rke_cmu_rotation_term` = False)."),
+    "R37": dict(tipo="bft", malha="BFY1", turb=BSL, bloco="H", muda="k-ω BSL (T4)."),
+    "R38": dict(tipo="bft", malha="BFY1", turb=SST, bloco="H", muda="k-ω SST: base de comparação (T3–T7)."),
+    "R39": dict(tipo="bft", malha="BFY1", turb=SST, curvatura=True, bloco="H", muda="SST com Curvature Correction (T6)."),
+    "R40": dict(tipo="bft", malha="BFY1", turb=RSM, bloco="H", muda="RSM linear com EWT: referência de fidelidade."),
+    "R41": dict(tipo="bft", malha="BFYW", turb=SST, bloco="H", muda="SST na malha de parede grosseira, y+ ≈ 30 (T7)."),
+    "R42": dict(tipo="bft", malha="BFY1", turb=RNG, bloco="H", muda="k-ε RNG com EWT (opcional)."),
+    "R43": dict(tipo="bft", malha="BFY1", turb=GEKO, csep=2.5, bloco="H",
+                muda="GEKO com C_SEP = 2,5 contra o padrão 1,75 (opcional): sensibilidade ao coeficiente de separação."),
 }
 
 BLOCO_ID = {"R01": "A", "R02": "A", "R03": "A", "R04": "A", "R05": "A", "R06": "B", "R07": "C", "R08": "C",
             "R09": "C", "R10": "C", "R11": "C", "R12": "D", "R13": "D", "R14": "D", "R15": "E", "R16": "E",
             "R17": "F"}
+
+# Nome-base de cada rodada: pasta e prefixo dos arquivos em results/.
+NOMES = {
+    "R01": "R01_CPP_M1_SIM_SOU", "R02": "R02_CPP_M2_SIM_SOU", "R03": "R03_CPP_M3_SIM_SOU",
+    "R04": "R04_CPP_M4_SIM_SOU", "R05": "R05_CPP_M2_SIM_FOU", "R06": "R06_CPR_M2_SIM_SOU",
+    "R07": "R07_LDC100_N040_SIM_FOU", "R08": "R08_LDC100_N040_SIM_SOU", "R09": "R09_LDC100_N040_SIM_QCK",
+    "R10": "R10_LDC100_N040_SIM_MUS", "R11": "R11_LDC100_N128_SIM_SOU", "R12": "R12_LDC100_N040_SMC_SOU",
+    "R13": "R13_LDC100_N040_PISO_SOU", "R14": "R14_LDC100_N040_CPL_SOU", "R15": "R15_BFS_D025_SIM_SOU",
+    "R16": "R16_BFSL_D025_SIM_SOU", "R17": "R17_CPU_M2_SIM_SOU", "R18": "R18_LDC100_N040_SIM_SOU_PRESTO",
+    "R19": "R19_CAVR_N040_SIM_SOU_OM0", "R20": "R20_CAVR_N040_SIM_SOU_OM0_PSTD",
+    "R21": "R21_CAVR_N040_SIM_SOU_OM1_PLIN", "R22": "R22_CAVR_N040_SIM_SOU_OM1_PSTD",
+    "R23": "R23_CAVR_N040_SIM_SOU_OM1_PSO", "R24": "R24_CAVR_N040_SIM_SOU_OM1_PBFW",
+    "R25": "R25_CAVR_N040_SIM_SOU_OM1_PPRS", "R26": "R26_CAVR_N128_SIM_SOU_OM1_PPRS",
+    "R27": "R27_CAVR_N128_SIM_SOU_OM1_PSO", "R28": "R28_DUTO_DU040_SIM_SOU_SST_PSO",
+    "R29": "R29_DUTO_DU040_SIM_SOU_SST_PSTD", "R30": "R30_DUTO_DU040_SIM_SOU_SST_PPRS",
+    "R31": "R31_DUTO_DU040_SIM_SOU_KES", "R32": "R32_DUTO_DU040_SIM_SOU_SST", "R33": "R33_DUTO_DU040_SIM_SOU_RSM",
+    "R34": "R34_DUTO_DU040_SIM_SOU_SSTCO", "R35": "R35_BFT_BFY1_SIM_SOU_KES", "R36": "R36_BFT_BFY1_SIM_SOU_REAL",
+    "R37": "R37_BFT_BFY1_SIM_SOU_BSL", "R38": "R38_BFT_BFY1_SIM_SOU_SST", "R39": "R39_BFT_BFY1_SIM_SOU_SSTCV",
+    "R40": "R40_BFT_BFY1_SIM_SOU_RSM", "R41": "R41_BFT_BFYW_SIM_SOU_SST", "R42": "R42_BFT_BFY1_SIM_SOU_RNG",
+    "R43": "R43_BFT_BFY1_SIM_SOU_GEKO",
+}
 
 
 def caso(cid):
@@ -149,12 +228,9 @@ def caso(cid):
     Returns:
         dict: Parâmetros completos (``id``, ``nome``, ``bloco``, ``dir``, física do tipo e métodos).
     """
-    import csv
-    with open(ROOT / "00_admin" / "registro_execucoes_v2.csv", encoding="utf-8") as f:
-        reg = {r["ID"]: r for r in csv.DictReader(f, delimiter=";")}
     c = {**TIPOS[CASES[cid]["tipo"]], **BASE, **CASES[cid]}
     c["id"] = cid
-    c["nome"] = reg[cid]["Arquivo_base"]
+    c["nome"] = NOMES[cid]
     c["bloco"] = c.get("bloco") or BLOCO_ID[cid]
     c["dir"] = RESULTS / BLOCOS[c["bloco"]] / c["nome"]
     return c

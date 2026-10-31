@@ -1,0 +1,98 @@
+{
+ "viscous_estado": {
+  "model": "k-omega",
+  "k_omega_model": "sst",
+  "k_omega_options": {
+   "kw_low_re_correction": false
+  },
+  "near_wall_treatment": {
+   "wall_omega_treatment": "correlation"
+  },
+  "transition_module": "none",
+  "options": {
+   "curvature_correction": false,
+   "corner_flow_correction": false,
+   "production_kato_launder_enabled": false,
+   "production_limiter": {
+    "enabled": true,
+    "clip_factor": 10.0
+   }
+  },
+  "turbulence_expert": {
+   "turb_non_newtonian": false,
+   "restore_sst_v61": false
+  },
+  "user_defined": {
+   "turb_visc_func": "none"
+  }
+ },
+ "periodic_dpdy": 4.0,
+ "urf": {
+  "body-force": 1.0,
+  "density": 1,
+  "k": 0.8,
+  "mom": 0.7,
+  "omega": 0.8,
+  "pressure": 0.3,
+  "turb-viscosity": 1
+ },
+ "malha": "DU040",
+ "zona_fluido": "geom_solid",
+ "general": {
+  "type": "pressure-based",
+  "velocity_formulation": "absolute",
+  "time": "steady"
+ },
+ "viscous": "k-omega",
+ "energy": false,
+ "rho": 1.0,
+ "mu": 0.0033333333333333335,
+ "paredes": {
+  "wall": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  }
+ },
+ "methods": {
+  "p_v": "SIMPLE",
+  "grad": "least-square-cell-based",
+  "disc": {
+   "k": "second-order-upwind",
+   "mom": "second-order-upwind",
+   "omega": "second-order-upwind",
+   "pressure": "standard"
+  }
+ },
+ "residual": {
+  "continuity": null,
+  "k": 1e-06,
+  "omega": 1e-06,
+  "x-velocity": 1e-06,
+  "y-velocity": 1e-06,
+  "z-velocity": 1e-06
+ },
+ "monitores": [
+  "rd_line_ub",
+  "rd_line_vs"
+ ],
+ "init": {
+  "k": 3.33,
+  "omega": 47.0,
+  "pressure": 0,
+  "x-velocity": 0,
+  "y-velocity": 0,
+  "z-velocity": 0
+ },
+ "iter_max": 30000,
+ "tempo_parede_s": 275.4,
+ "pyfluent": "0.37.2",
+ "reports_finais": {},
+ "continuacoes": [
+  {
+   "iter_extra": 750,
+   "tol_monitor": 0.0001,
+   "residuo_abs": 1e-12
+  }
+ ],
+ "iter_extra": 750
+}
