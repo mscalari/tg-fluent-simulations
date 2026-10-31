@@ -1,0 +1,116 @@
+{
+ "viscous_estado": {
+  "model": "k-omega",
+  "k_omega_model": "bsl",
+  "k_omega_options": {
+   "kw_low_re_correction": false
+  },
+  "near_wall_treatment": {
+   "wall_omega_treatment": "correlation"
+  },
+  "transition_module": "none",
+  "options": {
+   "curvature_correction": false,
+   "corner_flow_correction": false,
+   "production_kato_launder_enabled": false,
+   "production_limiter": {
+    "enabled": true,
+    "clip_factor": 10.0
+   }
+  },
+  "turbulence_expert": {
+   "turb_non_newtonian": false
+  },
+  "user_defined": {
+   "turb_visc_func": "none"
+  }
+ },
+ "inlet": {
+  "velocity_specification_method": "Magnitude, Normal to Boundary",
+  "reference_frame": "Absolute",
+  "velocity": {
+   "option": "profile",
+   "profile_name": "bfy-inlet",
+   "field_name": "u"
+  },
+  "initial_gauge_pressure": {
+   "option": "value",
+   "value": 0
+  }
+ },
+ "inlet_turb": {
+  "turbulent_specification": "Intensity and Viscosity Ratio",
+  "turbulent_intensity": 0.05,
+  "turbulent_viscosity_ratio_real": 10
+ },
+ "urf": {
+  "body-force": 1.0,
+  "density": 1,
+  "k": 0.8,
+  "mom": 0.7,
+  "omega": 0.8,
+  "pressure": 0.3,
+  "turb-viscosity": 1
+ },
+ "malha": "BFY1",
+ "zona_fluido": "solid-geom_surface",
+ "general": {
+  "type": "pressure-based",
+  "two_dim_space": "planar",
+  "velocity_formulation": "absolute",
+  "time": "steady"
+ },
+ "viscous": "k-omega",
+ "energy": false,
+ "rho": 1.0,
+ "mu": 2.777777777777778e-05,
+ "paredes": {
+  "wall_top": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  },
+  "wall_in_bottom": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  },
+  "wall_step": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  },
+  "wall_down_bottom": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  }
+ },
+ "methods": {
+  "p_v": "SIMPLE",
+  "grad": "least-square-cell-based",
+  "disc": {
+   "k": "second-order-upwind",
+   "mom": "second-order-upwind",
+   "omega": "second-order-upwind",
+   "pressure": "second-order"
+  }
+ },
+ "residual": {
+  "continuity": 1e-06,
+  "k": 1e-06,
+  "omega": 1e-06,
+  "x-velocity": 1e-06,
+  "y-velocity": 1e-06
+ },
+ "monitores": [
+  "rd_tau"
+ ],
+ "init": {
+  "k": 0.00375,
+  "omega": 13.5,
+  "pressure": 0,
+  "x-velocity": 1.0,
+  "y-velocity": 0
+ },
+ "iter_max": 20000,
+ "tempo_parede_s": 6399.6,
+ "pyfluent": "0.37.2",
+ "reports_finais": {}
+}

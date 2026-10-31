@@ -14,6 +14,7 @@ import ansys.fluent.core as pf
 from casos import ROOT, caso
 
 ITER_SINAL = 50
+BLOCO_SALVA = 2000  # iterações entre gravações de .cas/.dat nos casos turbulentos (um reinício do PC custa no máximo isso)
 
 
 def ler_rep(path):
@@ -67,12 +68,45 @@ def linha_monitor(st, nome, p0, p1, campo="x-velocity"):
     rd["rd_" + nome] = {"report_type": "surface-areaavg", "field": campo, "surface_names": [nome]}
 
 
+def modelo_turb(s, c):
+    """Aplica o modelo de turbulência do caso e as correções pedidas.
+
+    k-ε e RSM usam Enhanced Wall Treatment, pois o padrão (função de parede) não vale com y+ ≈ 1.
+
+    Args:
+        s (ansys.fluent.core.session_solver.Solver): Sessão com a malha lida.
+        c (dict): Parâmetros completos do caso.
+
+    Returns:
+        dict: Estado de ``viscous`` lido da sessão, mais ``geko_csep`` quando houver.
+
+    Raises:
+        AssertionError: Se o C_SEP não for aplicado.
+    """
+    v = s.settings.setup.models.viscous
+    for k, val in c["turb"].items():
+        setattr(v, k, val)
+    if c["turb"]["model"] != "k-omega":
+        v.near_wall_treatment.wall_treatment = "enhanced-wall-treatment"
+    if c.get("canto"):
+        v.options.corner_flow_correction = True
+    if c.get("curvatura"):
+        v.options.curvature_correction = True
+    ef = v()
+    if "csep" in c:
+        s.scheme.eval(f"(rpsetvar 'geko-csep {c['csep']})")
+        ef["geko_csep"] = s.scheme.eval("(rpgetvar 'geko-csep)")
+        assert abs(ef["geko_csep"] - c["csep"]) < 1e-12, ef["geko_csep"]
+    return ef
+
+
 def setup(s, c):
     """Monta o caso na sessão a partir dos parâmetros de ``casos.caso``.
 
     Comum a todos: malha, laminar, energia off, material ``fluido-tg``, métodos, URFs,
     resíduos absolutos de 1e-6, reports e inicialização standard com zeros. Depois aplica
-    o contorno do tipo (``cp_per``, ``cp_io``, ``ldc``, ``cavr`` ou ``bfs``). Os valores são lidos
+    o contorno do tipo (``cp_per``, ``cp_io``, ``ldc``, ``cavr``, ``bfs``, ``duto`` ou ``bft``). Os casos com
+    ``turb`` trocam o laminar pelo modelo pedido e usam SOU nas equações de turbulência. Os valores são lidos
     de volta da sessão para o registro.
 
     Args:
@@ -91,12 +125,15 @@ def setup(s, c):
     t = c["tipo"]
     ef = {}
 
-    if t == "cp_per":
+    if t in ("cp_per", "duto"):
         # make-periodic refeito a cada malha (guia, passo Fluent 5)
         s.tui.mesh.modify_zones.make_periodic("periodic_a", "periodic_b", "no", "yes", "yes")
         assert sorted(bc.periodic.keys()) == ["periodic_a", "periodic_b"]
 
-    st.setup.models.viscous.model = "laminar"           # padrão da sessão nova é k-omega
+    if "turb" in c:
+        ef["viscous_estado"] = modelo_turb(s, c)
+    else:
+        st.setup.models.viscous.model = "laminar"       # padrão da sessão nova é k-omega
     st.setup.models.energy.enabled = False
     fl = st.setup.materials.fluid
     fl.make_a_copy(from_="air", to="fluido-tg")
@@ -132,7 +169,7 @@ def setup(s, c):
         parede_movel(st, "lid", c["u_parede"])
         linha_monitor(st, "line_x0p5", [0.5, 0, 0], [0.5, 1, 0])
     elif t == "cavr":
-        # Frame Motion em 2D planar (eixo z implícito); nomes lidos pela API em tools/teste_frame_motion.py.
+        # Frame Motion em 2D planar (eixo z implícito).
         rf = st.setup.cell_zone_conditions.fluid[zona].reference_frame
         rf.frame_motion = True
         rf.mrf_omega = {"option": "value", "value": c["omega"]}
@@ -148,6 +185,30 @@ def setup(s, c):
         bc.pressure_outlet["outlet"].momentum.gauge_pressure = {"option": "value", "value": 0}
         linha_monitor(st, "line_x2", [2, 0, 0], [2, 1.5, 0])
         ef["inlet"] = bc.velocity_inlet["inlet"].momentum()
+    elif t == "duto":
+        # Prompts em 3D: gradiente, dir x, dir y, dir z. Como no CP, a direção vai oposta à do escoamento (+y).
+        s.execute_tui(f"/define/periodic-conditions/pressure-gradient-specification {c['dpdy']} 0 -1 0")
+        ef["periodic_dpdy"] = s.scheme.eval("(rpgetvar 'periodic/pressure-derivative)")
+        assert abs(ef["periodic_dpdy"] - c["dpdy"]) < 1e-12, f"gradiente não aplicado: {ef['periodic_dpdy']}"
+        linha_monitor(st, "line_ub", [-0.5, 0.05, 0], [0.5, 0.05, 0], campo="y-velocity")
+        # Na bissetriz do canto o escoamento secundário não se anula: bom monitor de V_s.
+        linha_monitor(st, "line_vs", [-0.45, 0.05, -0.45], [-0.1, 0.05, -0.1], campo="x-velocity")
+    elif t == "bft":
+        st.file.read_profile(file_name=str(ROOT / "refs" / c["perfil"]))
+        ent = bc.velocity_inlet["inlet"]
+        ent.momentum.velocity.set_state({"option": "profile", "profile_name": "bfy-inlet", "field_name": "u"})
+        sai = bc.pressure_outlet["outlet"]
+        sai.momentum.gauge_pressure = {"option": "value", "value": 0}
+        for z in (ent, sai):
+            z.turbulence.turbulent_specification = "Intensity and Viscosity Ratio"
+            z.turbulence.turbulent_intensity = c["I"]
+            z.turbulence.turbulent_viscosity_ratio_real = c["mut_mu"]
+        rd = st.solution.report_definitions.surface
+        rd.create("rd_tau")
+        rd["rd_tau"] = {"report_type": "surface-areaavg", "field": "x-wall-shear",
+                        "surface_names": ["wall_down_bottom"]}
+        ef["inlet"] = ent.momentum()
+        ef["inlet_turb"] = ent.turbulence()
 
     if t.startswith("cp"):
         fo = st.solution.report_definitions.force
@@ -168,6 +229,9 @@ def setup(s, c):
     m.discretization_scheme["pressure"] = c["pres"]
     m.discretization_scheme["mom"] = c["mom"]
     m.high_order_term_relaxation.enable = False
+    for k in m.discretization_scheme.keys():
+        if k not in ("pressure", "mom"):                 # equações de turbulência; o padrão muda com o modelo
+            m.discretization_scheme[k] = c["mom"]
     if c["alg"] != "Coupled":                            # no Coupled o objeto de URF fica inativo
         urf = st.solution.controls.under_relaxation
         urf["pressure"], urf["mom"] = c["urf_p"], c["urf_mom"]
@@ -175,12 +239,16 @@ def setup(s, c):
 
     res = st.solution.monitor.residual
     res.options.criterion_type = "absolute"
-    for eq in ("continuity", "x-velocity", "y-velocity"):
+    for eq in res.equations.keys():                      # inclui z e as equações de turbulência
         res.equations[eq] = {"monitor": True, "check_convergence": True, "absolute_criteria": 1e-6}
+    if t == "duto":
+        # O campo inicial já satisfaz a continuidade: o fator de escala fica ~1e-16 e o resíduo escalado não mede nada.
+        res.equations["continuity"].check_convergence = False
 
     ini = st.solution.initialization
     ini.initialization_type = "standard"
-    ini.defaults = {"pressure": 0, "x-velocity": 0, "y-velocity": 0}
+    ini_val = {"pressure": 0, "x-velocity": 0, "y-velocity": 0, "z-velocity": 0, **c.get("ini", {})}
+    ini.defaults = {k: v for k, v in ini_val.items() if k in ini.defaults()}
     ini.initialize()
 
     ef.update({
@@ -190,7 +258,7 @@ def setup(s, c):
         "paredes": {k: v.momentum() for k, v in bc.wall.items()},
         "methods": {"p_v": m.p_v_coupling.flow_scheme(), "grad": m.gradient_scheme(),
                     "disc": m.discretization_scheme()},
-        "residual": {k: v["absolute_criteria"] for k, v in res.equations().items()},
+        "residual": {k: v.get("absolute_criteria") for k, v in res.equations().items()},  # sem critério: a chave some
         "monitores": mon, "init": ini.defaults(), "iter_max": c["iter_max"],
     })
     print("SETUP EFETIVO:", ef, flush=True)
@@ -212,6 +280,11 @@ def exportar(s, c):
     """
     st = s.settings
     exportar_campo(st, c, f"../dados/{c['nome']}_campo.csv")
+    for z in c.get("paredes", ()):
+        st.file.export.ascii(file_name=f"../dados/{c['nome']}_parede_{z}.csv", surface_name_list=[z],
+                             delimiter="comma", location="cell-center",
+                             cell_func_domain=["pressure", "x-wall-shear", "y-wall-shear", "wall-shear", "y-plus"]
+                             + (["z-wall-shear"] if c.get("dim") == 3 else []))
     rds = [k for k in ("fx_top", "fx_bottom", "p_in", "p_out")
            if k in list(st.solution.report_definitions.force.keys()) + list(st.solution.report_definitions.surface.keys())]
     finais = {}
@@ -231,11 +304,18 @@ def exportar_campo(st, c, arquivo):
         arquivo (str): Caminho relativo ao diretório de trabalho do Fluent (``<dir>/fluent``).
     """
     # Guia, passo 14: Surfaces vazio exporta todas as células do domínio.
+    campos = ["pressure", "total-pressure", "velocity-magnitude", "x-velocity", "y-velocity"]
+    campos.append("z-velocity" if c.get("dim") == 3 else "stream-function")  # stream-function só existe em 2D
+    if c["tipo"] == "cavr":
+        campos += ["relative-x-velocity", "relative-y-velocity", "rel-velocity-magnitude"]
+    if "turb" in c:
+        campos += ["turb-kinetic-energy", "viscosity-turb", "viscosity-ratio", "cell-volume"]
+    if c.get("turb", {}).get("model") == "reynolds-stress":
+        campos += ["uu-reynolds-stress", "vv-reynolds-stress", "ww-reynolds-stress", "uv-reynolds-stress"]
+        if c.get("dim") == 3:
+            campos += ["vw-reynolds-stress", "uw-reynolds-stress"]
     st.file.export.ascii(file_name=arquivo, surface_name_list=[], delimiter="comma", location="cell-center",
-                         cell_func_domain=["pressure", "total-pressure", "velocity-magnitude", "x-velocity",
-                                           "y-velocity", "stream-function"]
-                         + (["relative-x-velocity", "relative-y-velocity", "rel-velocity-magnitude"]
-                            if c["tipo"] == "cavr" else []))
+                         cell_func_domain=campos)
 
 
 def iterar_com_quadros(s, c, rep, it):
@@ -259,6 +339,35 @@ def iterar_com_quadros(s, c, rep, it):
         s.settings.solution.run_calculation.iterate(iter_count=k)
         n = ler_rep(rep)[-1][0]
         exportar_campo(s.settings, c, f"../dados/anim/{c['nome']}_it{n:05d}.csv")
+        if n - feito < k:  # convergiu dentro do bloco
+            break
+        feito = n
+
+
+def iterar_salvando(s, c, rep, it, ef):
+    """Itera em blocos de ``BLOCO_SALVA``, gravando .cas/.dat e ``_setup.json`` ao fim de cada bloco.
+
+    Depois de um reinício do PC, a rodada segue com ``run_caso.py --continuar``.
+
+    Args:
+        s (ansys.fluent.core.session_solver.Solver): Sessão com o caso inicializado.
+        c (dict): Parâmetros completos do caso.
+        rep (Path): Report File do monitor, usado para saber a iteração atual.
+        it (int): Teto de iterações.
+        ef (dict): Setup efetivo, gravado junto.
+    """
+    inicio = ler_rep(rep)[-1][0] if rep.exists() and ler_rep(rep) else 0
+    sj = c["dir"] / "dados" / f"{c['nome']}_setup.json"
+    ef.setdefault("tempo_parede_s", 0.0)
+    feito = 0
+    while feito < it:
+        k = min(BLOCO_SALVA, it - feito)
+        t0 = time.time()
+        s.settings.solution.run_calculation.iterate(iter_count=k)
+        ef["tempo_parede_s"] = round(ef["tempo_parede_s"] + time.time() - t0, 1)
+        n = ler_rep(rep)[-1][0] - inicio
+        s.settings.file.write_case_data(file_name=c["nome"])
+        sj.write_text(json.dumps(ef, indent=1, default=str))
         if n - feito < k:  # convergiu dentro do bloco
             break
         feito = n
@@ -294,7 +403,7 @@ def encerrar(s):
 
 
 def lancar(c):
-    """Cria as pastas da execução e abre o Fluent 2D, dupla precisão, serial, sem GUI.
+    """Cria as pastas da execução e abre o Fluent 2D ou 3D (``c["dim"]``), dupla precisão, sem GUI.
 
     O diretório de trabalho do Fluent é ``<dir>/fluent``: .cas/.dat e transcrições caem lá.
 
@@ -306,8 +415,9 @@ def lancar(c):
     """
     for sub in ("fluent", "dados", "graficos", "logs"):
         (c["dir"] / sub).mkdir(parents=True, exist_ok=True)
-    return pf.launch_fluent(product_version=pf.FluentVersion.v241, dimension=pf.Dimension.TWO,
-                            precision=pf.Precision.DOUBLE, processor_count=1, ui_mode=pf.UIMode.NO_GUI,
+    return pf.launch_fluent(product_version=pf.FluentVersion.v241,
+                            dimension=pf.Dimension.THREE if c.get("dim") == 3 else pf.Dimension.TWO,
+                            precision=pf.Precision.DOUBLE, processor_count=c.get("procs", 1), ui_mode=pf.UIMode.NO_GUI,
                             mode="solver", cwd=str(c["dir"] / "fluent"), cleanup_on_exit=False)
 
 
@@ -318,23 +428,26 @@ def arrumar(c):
         c (dict): Parâmetros completos do caso.
     """
     for f in (c["dir"] / "fluent").glob("*"):
-        if f.suffix == ".trn" or f.name.endswith("error.log"):
-            f.replace(c["dir"] / "logs" / f.name)
-        elif f.name.startswith("cleanup-fluent"):
-            f.unlink()
+        try:
+            if f.suffix == ".trn" or f.name.endswith("error.log"):
+                f.replace(c["dir"] / "logs" / f.name)
+            elif f.name.startswith("cleanup-fluent"):
+                f.unlink()
+        except PermissionError:  # o Fluent pode segurar o arquivo por alguns segundos; a solução já foi gravada
+            print(f"não movido (em uso): {f.name}", flush=True)
 
 
 def run(cid):
     """Executa um caso: setup, solução, gravação e exportação.
 
-    No CP periódico roda ``ITER_SINAL`` iterações para checar o sinal de ū antes de
+    No CP periódico e no duto roda ``ITER_SINAL`` iterações para checar o sinal de ū antes de
     seguir até ``iter_max`` (o Fluent para sozinho ao convergir).
 
     Args:
         cid (str): ID do registro, por exemplo ``"R02"``.
 
     Raises:
-        RuntimeError: Se ū não for positivo após ``ITER_SINAL`` iterações no CP periódico.
+        RuntimeError: Se ū não for positivo após ``ITER_SINAL`` iterações (CP periódico ou duto).
     """
     c = caso(cid)
     s = lancar(c)
@@ -344,18 +457,21 @@ def run(cid):
         ef = setup(s, c)
         t0 = time.time()
         it = c["iter_max"]
-        if c["tipo"] == "cp_per":
+        if c["tipo"] in ("cp_per", "duto"):
             s.settings.solution.run_calculation.iterate(iter_count=ITER_SINAL)
             ub = ler_rep(rep)[-1][1]
             print(f"ubar após {ITER_SINAL} it = {ub:.6f}", flush=True)
             if ub <= 0:
                 raise RuntimeError(f"ubar negativo após {ITER_SINAL} iterações: sinal do gradiente/direção errado")
             it -= ITER_SINAL
-        if c.get("anim_cada"):
+        if "turb" in c:
+            iterar_salvando(s, c, rep, it, ef)
+        elif c.get("anim_cada"):
             iterar_com_quadros(s, c, rep, it)
         else:
             s.settings.solution.run_calculation.iterate(iter_count=it)
-        ef["tempo_parede_s"] = round(time.time() - t0, 1)
+        if "turb" not in c:
+            ef["tempo_parede_s"] = round(time.time() - t0, 1)
         ef["pyfluent"] = pf.__version__
         s.settings.file.write_case_data(file_name=c["nome"])
         ef["reports_finais"] = exportar(s, c)
@@ -415,11 +531,13 @@ def continuar(cid, n_iter, tol_mon=None):
         t0 = time.time()
         it0 = ler_rep(rep)[-1][0]
         if tol_mon is None:
-            s.settings.solution.run_calculation.iterate(iter_count=n_iter)
+            iterar_salvando(s, c, rep, n_iter, ef)
+            t0 = time.time()                             # iterar_salvando já somou o tempo
         else:
             res = s.settings.solution.monitor.residual
-            for eq in ("continuity", "x-velocity", "y-velocity"):
-                res.equations[eq].absolute_criteria = 1e-12
+            for eq in res.equations.keys():
+                if c["tipo"] != "duto" or eq != "continuity":  # no duto a continuidade não tem critério
+                    res.equations[eq].absolute_criteria = 1e-12
             while True:
                 s.settings.solution.run_calculation.iterate(iter_count=250)
                 v = [x for _, x in ler_rep(rep)[-50:]]
@@ -430,7 +548,7 @@ def continuar(cid, n_iter, tol_mon=None):
         extra = ler_rep(rep)[-1][0] - it0
         ef.setdefault("continuacoes", []).append(
             {"iter_extra": extra, "tol_monitor": tol_mon,
-             "residuo_abs": 1e-12 if tol_mon else ef["residual"]["continuity"]})
+             "residuo_abs": 1e-12 if tol_mon else ef["residual"]["x-velocity"]})
         ef["iter_extra"] = ef.get("iter_extra", 0) + extra
         ef["tempo_parede_s"] = round(ef["tempo_parede_s"] + time.time() - t0, 1)
         s.settings.file.write_case_data(file_name=c["nome"])

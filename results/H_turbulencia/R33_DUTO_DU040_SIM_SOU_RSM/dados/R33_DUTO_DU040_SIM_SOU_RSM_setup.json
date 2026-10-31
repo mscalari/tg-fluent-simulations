@@ -1,0 +1,98 @@
+{
+ "viscous_estado": {
+  "model": "reynolds-stress",
+  "near_wall_treatment": {
+   "wall_treatment": "enhanced-wall-treatment",
+   "enhanced_wall_treatment_options": {
+    "pressure_gradient_effects": false
+   }
+  },
+  "reynolds_stress_model": "rsm-linear-pressure-strain",
+  "reynolds_stress_options": {
+   "solve_tke": true,
+   "wall_echo": true
+  },
+  "options": {},
+  "turbulence_expert": {
+   "turb_non_newtonian": false
+  },
+  "user_defined": {}
+ },
+ "periodic_dpdy": 4.0,
+ "urf": {
+  "body-force": 1.0,
+  "density": 1,
+  "drsm": 0.5,
+  "epsilon": 0.8,
+  "k": 0.8,
+  "mom": 0.7,
+  "pressure": 0.3,
+  "turb-viscosity": 1
+ },
+ "malha": "DU040",
+ "zona_fluido": "geom_solid",
+ "general": {
+  "type": "pressure-based",
+  "velocity_formulation": "absolute",
+  "time": "steady"
+ },
+ "viscous": "reynolds-stress",
+ "energy": false,
+ "rho": 1.0,
+ "mu": 0.0033333333333333335,
+ "paredes": {
+  "wall": {
+   "motion_bc": "Stationary Wall",
+   "shear_bc": "No Slip"
+  }
+ },
+ "methods": {
+  "p_v": "SIMPLE",
+  "grad": "least-square-cell-based",
+  "disc": {
+   "drsm": "second-order-upwind",
+   "epsilon": "second-order-upwind",
+   "k": "second-order-upwind",
+   "mom": "second-order-upwind",
+   "pressure": "second-order"
+  }
+ },
+ "residual": {
+  "continuity": null,
+  "epsilon": 1e-06,
+  "k": 1e-06,
+  "uu-stress": 1e-06,
+  "uv-stress": 1e-06,
+  "uw-stress": 1e-06,
+  "vv-stress": 1e-06,
+  "vw-stress": 1e-06,
+  "ww-stress": 1e-06,
+  "x-velocity": 1e-06,
+  "y-velocity": 1e-06,
+  "z-velocity": 1e-06
+ },
+ "monitores": [
+  "rd_line_ub",
+  "rd_line_vs"
+ ],
+ "init": {
+  "epsilon": 14.0,
+  "k": 3.33,
+  "pressure": 0,
+  "x-velocity": 0,
+  "y-velocity": 0,
+  "z-velocity": 0
+ },
+ "iter_max": 30000,
+ "tempo_parede_s": 389.3,
+ "pyfluent": "0.37.2",
+ "reports_finais": {},
+ "continuacoes": [
+  {
+   "iter_extra": 500,
+   "tol_monitor": 0.0001,
+   "residuo_abs": 1e-12
+  }
+ ],
+ "iter_extra": 500
+}
