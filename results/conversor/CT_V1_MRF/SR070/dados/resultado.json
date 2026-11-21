@@ -1,0 +1,604 @@
+{
+ "sr": 0.7,
+ "it_ini": 3000,
+ "it_fim": 3700,
+ "convergiu": true,
+ "deriva_media": {
+  "t_bomba": 0.0015573814720125957,
+  "t_turbina": 0.00017409853348544205,
+  "t_estator": 0.0006712187624466206
+ },
+ "media_janela": {
+  "t_bomba": -18441.929093081333,
+  "t_turbina": 17181.370025691624,
+  "t_estator": 1258.2758236233049,
+  "t_total": -2.2832437664075123,
+  "m_bomba_turbina_bomba": -224.37515634243147,
+  "h_bomba_turbina_bomba": 311.45553238385475,
+  "m_bomba_turbina_turbina": 224.37515634243147,
+  "h_bomba_turbina_turbina": 296.5449463055737,
+  "m_turbina_estator_turbina": -224.4328045954769,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 224.43280459547697,
+  "h_turbina_estator_estator": 162.0136803271848,
+  "m_estator_bomba_estator": -224.41751938739836,
+  "h_estator_bomba_estator": -13.287204070866316,
+  "m_estator_bomba_bomba": 224.41751938739836,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "desvio_janela": {
+  "t_bomba": 149.68964755938796,
+  "t_turbina": 151.50894488935475,
+  "t_estator": 22.531545695445992,
+  "t_total": 121.300790526063,
+  "m_bomba_turbina_bomba": 1.020011162828795,
+  "h_bomba_turbina_bomba": 10.427197625654726,
+  "m_bomba_turbina_turbina": 1.0200111628287998,
+  "h_bomba_turbina_turbina": 12.36216561606627,
+  "m_turbina_estator_turbina": 0.2615361698709284,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 0.26153616987094885,
+  "h_turbina_estator_estator": 1.5906411418756932,
+  "m_estator_bomba_estator": 0.16707738865399624,
+  "h_estator_bomba_estator": 0.019398254945110868,
+  "m_estator_bomba_bomba": 0.16707738865399688,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "janela": 200,
+ "tempo_s": 3272.3,
+ "reports_inst": {
+  "t_bomba": -18317.16131762892,
+  "t_turbina": 17017.094851166,
+  "t_estator": 1283.905322143677,
+  "t_total": -16.16114431924104,
+  "m_bomba_turbina_bomba": -224.993042741664,
+  "h_bomba_turbina_bomba": 326.8435793161628,
+  "m_bomba_turbina_turbina": 224.9930427416635,
+  "h_bomba_turbina_turbina": 279.5200588793264,
+  "m_turbina_estator_turbina": -224.6147355149237,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 224.6147355149237,
+  "h_turbina_estator_estator": 159.3074005720535,
+  "m_estator_bomba_estator": -224.5461935378568,
+  "h_estator_bomba_estator": -13.31293591437679,
+  "m_estator_bomba_bomba": 224.5461935378568,
+  "h_estator_bomba_bomba": 0.0,
+  "paredes_zona": {
+   "fluido_bomba": -18420.81052857724,
+   "fluido_turbina": 17118.5144435141,
+   "fluido_estator": 1286.134940743899
+  }
+ },
+ "reports": {
+  "t_bomba": -18441.929093081333,
+  "t_turbina": 17181.370025691624,
+  "t_estator": 1258.2758236233049,
+  "t_total": -2.2832437664075123,
+  "m_bomba_turbina_bomba": -224.37515634243147,
+  "h_bomba_turbina_bomba": 311.45553238385475,
+  "m_bomba_turbina_turbina": 224.37515634243147,
+  "h_bomba_turbina_turbina": 296.5449463055737,
+  "m_turbina_estator_turbina": -224.4328045954769,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 224.43280459547697,
+  "h_turbina_estator_estator": 162.0136803271848,
+  "m_estator_bomba_estator": -224.41751938739836,
+  "h_estator_bomba_estator": -13.287204070866316,
+  "m_estator_bomba_bomba": 224.41751938739836,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "rotacao": {
+  "frames": {
+   "fluido_bomba": {
+    "frame_motion": true,
+    "mrf_relative_to_thread": "absolute",
+    "mrf_omega": {
+     "option": "value",
+     "value": 209.43951023931953
+    },
+    "reference_frame_velocity": [
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0
+     }
+    ],
+    "reference_frame_axis_origin": [
+     {
+      "option": "value",
+      "value": 0.0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     }
+    ],
+    "reference_frame_axis_direction": [
+     {
+      "option": "value",
+      "value": 1.0
+     },
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     }
+    ],
+    "reference_frame_zone_motion_function": "none"
+   },
+   "fluido_turbina": {
+    "frame_motion": true,
+    "mrf_relative_to_thread": "absolute",
+    "mrf_omega": {
+     "option": "value",
+     "value": 146.60765716752366
+    },
+    "reference_frame_velocity": [
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0
+     }
+    ],
+    "reference_frame_axis_origin": [
+     {
+      "option": "value",
+      "value": 0.0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     }
+    ],
+    "reference_frame_axis_direction": [
+     {
+      "option": "value",
+      "value": 1.0
+     },
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     }
+    ],
+    "reference_frame_zone_motion_function": "none"
+   },
+   "fluido_estator": {
+    "frame_motion": false,
+    "reference_frame_axis_origin": [
+     {
+      "option": "value",
+      "value": 0.0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     },
+     {
+      "option": "value",
+      "value": 0.0
+     }
+    ],
+    "reference_frame_axis_direction": [
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 0
+     },
+     {
+      "option": "value",
+      "value": 1
+     }
+    ]
+   }
+  },
+  "paredes_abs": {
+   "parede_bomba_lado_turbina": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 209.43951023931953
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "parede_bomba_lado_estator": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 209.43951023931953
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "parede_estator_lado_turbina": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 0
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "parede_estator_lado_bomba": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 0
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "sobra_if_bt_lado_bomba": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 146.60765716752366
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "sobra_if_bt_lado_turbina": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 209.43951023931953
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "sobra_if_te_lado_estator": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 146.60765716752366
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "sobra_if_te_lado_turbina": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 0
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "sobra_if_eb_lado_bomba": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 0
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   },
+   "sobra_if_eb_lado_estator": {
+    "motion_bc": "Moving Wall",
+    "shear_bc": "No Slip",
+    "relative": false,
+    "rotating": true,
+    "components": false,
+    "omega": {
+     "option": "value",
+     "value": 209.43951023931953
+    },
+    "rotation_axis_origin": [
+     0,
+     0,
+     0
+    ],
+    "rotation_axis_direction": [
+     1.0,
+     0,
+     0.0
+    ]
+   }
+  }
+ },
+ "omega_b": 209.43951023931953,
+ "omega_t": 146.60765716752366,
+ "rpm_b": 2000.0,
+ "sinal": 1,
+ "figuras": {
+  "01_meridional_pressao": true,
+  "02_meridional_pressao_total": true,
+  "03_meridional_vabs": true,
+  "04_meridional_vrel": true,
+  "05_meridional_v_axial": true,
+  "06_meridional_v_radial": true,
+  "07_meridional_v_tangencial": true,
+  "08_meridional_k": true,
+  "09_meridional_mut_mu": true,
+  "10_meridional_vetores_vrel": true,
+  "20_raio_raio_bomba_pressao": true,
+  "20_raio_raio_bomba_vetores": true,
+  "21_raio_raio_turbina_pressao": true,
+  "21_raio_raio_turbina_vetores": true,
+  "22_raio_raio_estator_pressao": true,
+  "22_raio_raio_estator_vetores": true,
+  "30_corte_x_bomba_pressao": true,
+  "30_corte_x_bomba_vrel": true,
+  "31_corte_x_turbina_pressao": true,
+  "31_corte_x_turbina_vrel": true,
+  "32_corte_x_estator_pressao": true,
+  "32_corte_x_estator_vrel": true,
+  "4_bomba_pressao_de_menos_x": true,
+  "4_bomba_pressao_de_mais_x": true,
+  "4_bomba_tau_w_de_menos_x": true,
+  "4_bomba_tau_w_de_mais_x": true,
+  "4_bomba_yplus_de_menos_x": true,
+  "4_bomba_yplus_de_mais_x": true,
+  "4_turbina_pressao_de_menos_x": true,
+  "4_turbina_pressao_de_mais_x": true,
+  "4_turbina_tau_w_de_menos_x": true,
+  "4_turbina_tau_w_de_mais_x": true,
+  "4_turbina_yplus_de_menos_x": true,
+  "4_turbina_yplus_de_mais_x": true,
+  "4_estator_pressao_de_menos_x": true,
+  "4_estator_pressao_de_mais_x": true,
+  "4_estator_tau_w_de_menos_x": true,
+  "4_estator_tau_w_de_mais_x": true,
+  "4_estator_yplus_de_menos_x": true,
+  "4_estator_yplus_de_mais_x": true,
+  "5_if_bomba_turbina_lado_bomba_v_axial": true,
+  "5_if_bomba_turbina_lado_bomba_v_tangencial": true,
+  "5_if_bomba_turbina_lado_bomba_v_radial": true,
+  "5_if_bomba_turbina_lado_turbina_v_axial": true,
+  "5_if_bomba_turbina_lado_turbina_v_tangencial": true,
+  "5_if_bomba_turbina_lado_turbina_v_radial": true,
+  "5_if_turbina_estator_lado_turbina_v_axial": true,
+  "5_if_turbina_estator_lado_turbina_v_tangencial": true,
+  "5_if_turbina_estator_lado_turbina_v_radial": true,
+  "5_if_turbina_estator_lado_estator_v_axial": true,
+  "5_if_turbina_estator_lado_estator_v_tangencial": true,
+  "5_if_turbina_estator_lado_estator_v_radial": true,
+  "5_if_estator_bomba_lado_estator_v_axial": true,
+  "5_if_estator_bomba_lado_estator_v_tangencial": true,
+  "5_if_estator_bomba_lado_estator_v_radial": true,
+  "5_if_estator_bomba_lado_bomba_v_axial": true,
+  "5_if_estator_bomba_lado_bomba_v_tangencial": true,
+  "5_if_estator_bomba_lado_bomba_v_radial": true,
+  "6_pathlines_iso": true,
+  "6_pathlines_de_mais_x": true,
+  "6_pathlines_meridional": true,
+  "7_vortices_q": true
+ },
+ "verificacao": {
+  "reference_values": {
+   "area": 1,
+   "density": 1.225,
+   "enthalpy": 0,
+   "length": 1,
+   "pressure": 0,
+   "temperature": 288.16,
+   "yplus": 300,
+   "velocity": 1,
+   "viscosity": 1.7894e-05,
+   "zone": "fluido_bomba"
+  },
+  "tipo_antes": {
+   "t_bomba": "Drag Coefficient",
+   "t_turbina": "Drag Coefficient",
+   "t_estator": "Drag Coefficient",
+   "t_total": "Drag Coefficient"
+  },
+  "opcoes": {
+   "t_bomba": "Drag Force",
+   "t_turbina": "Drag Force",
+   "t_estator": "Drag Force",
+   "t_total": "Drag Force",
+   "z_fluido_bomba": "Drag Force",
+   "z_fluido_turbina": "Drag Force",
+   "z_fluido_estator": "Drag Force"
+  },
+  "antes": {
+   "t_bomba": -18317.16131762892,
+   "t_turbina": 17017.094851166,
+   "t_estator": 1283.905322143677,
+   "t_total": -16.16114431924104
+  },
+  "depois_nm": {
+   "t_bomba": -11219.26130704771,
+   "t_turbina": 10422.97059633918,
+   "t_estator": 786.3920098130022,
+   "t_total": -9.89870089553514
+  },
+  "razao_nm_sobre_antes": {
+   "t_bomba": 0.6124999999999997,
+   "t_turbina": 0.6125000000000004,
+   "t_estator": 0.6125,
+   "t_total": 0.6125000000000002
+  },
+  "sobras_nm": {
+   "s_sobra_if_eb_lado_estator": -3.323609997135817,
+   "s_sobra_if_eb_lado_bomba": 1.329670628803954,
+   "s_sobra_if_te_lado_turbina": -1.382353620723451,
+   "s_sobra_if_te_lado_estator": 3.279464818391012,
+   "s_sobra_if_bt_lado_turbina": 41.53170969964071,
+   "s_sobra_if_bt_lado_bomba": -25.53874752199842
+  },
+  "interior": [
+   "if_eb",
+   "if_te",
+   "if_bt",
+   "interior--fluido_estator",
+   "interior--fluido_turbina",
+   "interior--fluido_bomba"
+  ],
+  "euler_campos": [
+   "x-velocity",
+   "y-velocity",
+   "z-velocity",
+   "density",
+   "x-face-area",
+   "y-face-area",
+   "z-face-area",
+   "viscosity-eff",
+   "viscosity-lam",
+   "viscosity-ratio",
+   "radial-coordinate",
+   "tangential-velocity",
+   "dx-velocity-dx",
+   "dx-velocity-dy",
+   "dx-velocity-dz",
+   "dy-velocity-dx",
+   "dy-velocity-dy",
+   "dy-velocity-dz",
+   "dz-velocity-dx",
+   "dz-velocity-dy",
+   "dz-velocity-dz"
+  ],
+  "euler_gradientes": [
+   "dx-velocity-dx",
+   "dx-velocity-dy",
+   "dx-velocity-dz",
+   "dy-velocity-dx",
+   "dy-velocity-dy",
+   "dy-velocity-dz",
+   "dz-velocity-dx",
+   "dz-velocity-dy",
+   "dz-velocity-dz"
+  ]
+ }
+}
