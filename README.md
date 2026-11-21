@@ -73,6 +73,28 @@ O perfil de entrada é uma lei 1/7, não o perfil medido; por isso a comparaçã
 que o valor absoluto de x_r. Nas rodadas que não atingiram 1e-6, a continuidade estagnou; o monitor de
 τ_w oscila menos de 0,2 %, exceto no R40. O valor de x_r do R40 é um instante dessa oscilação.
 
+## Conversor de torque CT_V1 (MRF)
+
+Simulação 3D do conversor (bomba, turbina e estator; 1,9 M células; malha `mesh/CT_V1_3zonas.msh.h5`,
+fora do git) com referenciais múltiplos (MRF), k-ω SST com correção de curvatura, PRESTO! e SIMPLE.
+A bomba gira a 2000 rpm em torno de +x e a turbina a SR·ω_b; o estator fica parado.
+
+```bash
+export PYTHONIOENCODING=utf-8
+.venv241/Scripts/python.exe tools/conversor_mrf.py sentido 500     # SR = 0 nos dois sentidos de rotação
+.venv241/Scripts/python.exe tools/conversor_mrf.py varredura 1     # SR = 0 … 0,9, cada ponto parte do anterior
+.venv241/Scripts/python.exe tools/conversor_mrf.py refazer_figuras # relê o .cas/.dat de cada ponto e refaz as imagens
+.venv241/Scripts/python.exe tools/analise_conversor.py             # gráficos, curvas TR/η/K, Euler e nota do Obsidian
+```
+
+Saídas em `results/conversor/CT_V1_MRF/SRxxx/{fluent,dados,graficos}`: cerca de 60 imagens do Fluent por
+ponto (plano meridional, cortes axiais, raios constantes, pás, interfaces, linhas de corrente, critério Q)
+mais monitores, resíduos, y⁺ e perfis nas interfaces (matplotlib); curvas globais em `CT_V1_MRF/graficos`.
+O Coupled não cabe nos 16 GB de RAM desta malha (swap); por isso SIMPLE. Os torques oscilam ~1,5 % sem
+deriva: o ponto para quando a média de 200 iterações estabiliza, e os valores são essas médias.
+Na varredura as imagens do Fluent saem em branco (só a legenda): a janela gráfica fica presa aos plots
+de monitor. Por isso as figuras são refeitas depois, relendo o caso de cada ponto numa sessão nova.
+
 ## Documentação
 
 | Arquivo | Conteúdo |

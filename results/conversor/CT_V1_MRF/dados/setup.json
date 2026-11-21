@@ -1,0 +1,31 @@
+{
+ "sobras": {
+  "sobra_if_eb_lado_estator": "bomba",
+  "sobra_if_eb_lado_bomba": "estator",
+  "sobra_if_te_lado_turbina": "estator",
+  "sobra_if_te_lado_estator": "turbina",
+  "sobra_if_bt_lado_turbina": "bomba",
+  "sobra_if_bt_lado_bomba": "turbina"
+ },
+ "grupos_torque": {
+  "bomba": [
+   "parede_bomba",
+   "parede_bomba_lado_turbina",
+   "parede_bomba_lado_estator",
+   "sobra_if_eb_lado_estator",
+   "sobra_if_bt_lado_turbina"
+  ],
+  "turbina": [
+   "parede_turbina",
+   "sobra_if_te_lado_estator",
+   "sobra_if_bt_lado_bomba"
+  ],
+  "estator": [
+   "parede_estator",
+   "parede_estator_lado_turbina",
+   "parede_estator_lado_bomba",
+   "sobra_if_eb_lado_bomba",
+   "sobra_if_te_lado_turbina"
+  ]
+ }
+}
