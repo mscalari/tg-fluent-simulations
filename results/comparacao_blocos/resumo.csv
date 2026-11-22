@@ -1,0 +1,44 @@
+﻿bloco;rodada;metrica_principal;valor;referencia;desvio;convergiu;nota
+A;R01;e_L2 [%];1.08174;0 (analítico u = 2d+20d(1−d));1,0817 %;S;h = 1/10 m
+A;R02;e_L2 [%];0.270584;0 (analítico u = 2d+20d(1−d));0,2706 %;S;h = 1/20 m
+A;R03;e_L2 [%];0.0676045;0 (analítico u = 2d+20d(1−d));0,0676 %;S;h = 1/40 m
+A;R04;e_L2 [%];0.0166312;0 (analítico u = 2d+20d(1−d));0,0166 %;S;h = 1/80 m
+A;R05;e_L2 [%];0.270583;0 (analítico u = 2d+20d(1−d));"0,2706 % (= R02; max|Δu| vs R02 = 1.4e-08 m/s)";S;FOU igual ao SOU em escoamento desenvolvido
+B;R06;Δp [Pa];19.6661;20 Pa (G·L = 4 Pa/m · 5 m);−1,7 %;S;e_L2 do perfil = 0.5068 %
+C;R07;max|Δu| vs Ghia [m/s];0.0179664;Ghia et al. (1982), Tabela I (Re = 100);17,97e-3 m/s;S;"max|Δv| = 0.01627 m/s; rms Δu = 0.01024; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+C;R08;max|Δu| vs Ghia [m/s];0.00575641;Ghia et al. (1982), Tabela I (Re = 100);5,76e-3 m/s;S;"max|Δv| = 0.006783 m/s; rms Δu = 0.002095; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+C;R09;max|Δu| vs Ghia [m/s];0.00497236;Ghia et al. (1982), Tabela I (Re = 100);4,97e-3 m/s;S;"max|Δv| = 0.00693 m/s; rms Δu = 0.001896; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+C;R10;max|Δu| vs Ghia [m/s];0.00520054;Ghia et al. (1982), Tabela I (Re = 100);5,20e-3 m/s;S;"max|Δv| = 0.007074 m/s; rms Δu = 0.001932; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+C;R11;max|Δu| vs Ghia [m/s];0.00504471;Ghia et al. (1982), Tabela I (Re = 100);5,04e-3 m/s;S;"max|Δv| = 0.008805 m/s; rms Δu = 0.002494; centro = (0.6133; 0.7383) vs Ghia (0,6172; 0,7344)"
+D;R12;max|Δu| vs Ghia [m/s];0.00575634;Ghia et al. (1982), Tabela I (Re = 100);5,76e-3 m/s;S;"max|Δv| = 0.006783 m/s; rms Δu = 0.002095; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+D;R13;max|Δu| vs Ghia [m/s];0.00575892;Ghia et al. (1982), Tabela I (Re = 100);5,76e-3 m/s;S;"max|Δv| = 0.006785 m/s; rms Δu = 0.002096; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+D;R14;max|Δu| vs Ghia [m/s];0.00576136;Ghia et al. (1982), Tabela I (Re = 100);5,76e-3 m/s;S;"max|Δv| = 0.006788 m/s; rms Δu = 0.002096; centro = (0.6125; 0.7375) vs Ghia (0,6172; 0,7344)"
+E;R15;x_r/h (cota inferior);2.97493;sem referência em refs/;n/d;S;x_r > 1.487 m: a bolha atravessa a saída, x_r indefinido
+E;R16;x_r/h;3.8414;sem referência em refs/ (Roteiro não traz x_r);n/d;S;"x_r = 1.9207 m a partir do degrau; h = 0,5 m"
+F;R17;Δp [Pa];25.7155;26,34 Pa (balanço: atrito do Fluent 23,78 Pa + ρ(β−1)ū² = 2,56 Pa);−2,4 %;S;"e_L2 do perfil = 0.6548 %; mínimo físico 22,56 Pa; +28,6 % contra G·L não é desvio"
+G;R18;max|Δu| vs R19 sem tampa [% u_max];1.10262;"R19 (Second Order, Ω = 0); limite G1 = 1 %";+0,10 p.p. em relação ao limite de 1 %;S;"rms = 0.553 %; Ω = 0 (controle)"
+G;R19;max|Δu| vs R19 sem tampa [% u_max];0;R19 (Second Order, Ω = 0);0 (própria referência);S;controle Ω = 0
+G;R20;max|Δu| vs R19 sem tampa [% u_max];2.44515;"R19 (Second Order, Ω = 0); limite G1 = 1 %";+1,45 p.p. em relação ao limite de 1 %;S;"rms = 0.214 %; Ω = 0 (controle)"
+G;R21;e_L2 de u contra R26 [%];4.50287;R26 (N128, PRESTO!, Ω = 1, referência interna);+4,50 %;S;"cb = 0.1797 (R26: 0.0155 se existir); overshoot = 0.001877 m/s"
+G;R22;e_L2 de u contra R26 [%];4.47921;R26 (N128, PRESTO!, Ω = 1, referência interna);+4,48 %;S;"cb = 0.1744 (R26: 0.0155 se existir); overshoot = 0.001626 m/s"
+G;R23;e_L2 de u contra R26 [%];4.64614;R26 (N128, PRESTO!, Ω = 1, referência interna);+4,65 %;S;"cb = 0.1739 (R26: 0.0155 se existir); overshoot = 0.001817 m/s"
+G;R24;e_L2 de u contra R26 [%];4.48565;R26 (N128, PRESTO!, Ω = 1, referência interna);+4,49 %;S;"cb = 0.1144 (R26: 0.0155 se existir); overshoot = 0 m/s"
+G;R25;e_L2 de u contra R26 [%];2.66954;R26 (N128, PRESTO!, Ω = 1, referência interna);+2,67 %;S;"cb = 0.09871 (R26: 0.0155 se existir); overshoot = 0 m/s"
+G;R26;cb [–];0.0155004;própria referência interna (N128, PRESTO!);0 (referência);S;Ω = 1 rad/s
+G;R27;e_L2 de u contra R26 [%];0.74087;R26 (N128, PRESTO!);+0,74 %;S;"checagem da referência; max|Δu|/|V| sem fileira da tampa = 0.918 %; cb = 0.04091"
+G;R28;Cf [–];0.0100431;Pirozzoli et al. (2018), Tabela 1 caso A: 9,38e-3 (ordem de grandeza);+7,1 %;S;"U_b = 14.1117 m/s (DNS ≈ 14,7); vs/U_b = 2e-13 %; duto 3D, pressão Second Order"
+G;R29;Cf [–];0.0100431;Pirozzoli et al. (2018), Tabela 1 caso A: 9,38e-3 (ordem de grandeza);+7,1 %;S;"U_b = 14.1117 m/s (DNS ≈ 14,7); vs/U_b = 1.8e-13 %; duto 3D, pressão Standard"
+G;R30;Cf [–];0.0100431;Pirozzoli et al. (2018), Tabela 1 caso A: 9,38e-3 (ordem de grandeza);+7,1 %;S;"U_b = 14.1117 m/s (DNS ≈ 14,7); vs/U_b = 2e-13 %; duto 3D, pressão PRESTO!"
+H-duto;R31;|V_s|máx/U_b [%];2.05764e-13;Pirozzoli et al. (2018): 1–2 % de U_b;−1,00 p.p. fora da faixa;S;"U_b = 13.618 m/s (DNS ≈ 14,7); Cf = 1.078e-02 (ref. 9,38e-3)"
+H-duto;R32;|V_s|máx/U_b [%];2.01663e-13;Pirozzoli et al. (2018): 1–2 % de U_b;−1,00 p.p. fora da faixa;S;"U_b = 14.112 m/s (DNS ≈ 14,7); Cf = 1.004e-02 (ref. 9,38e-3)"
+H-duto;R33;|V_s|máx/U_b [%];2.28041;Pirozzoli et al. (2018): 1–2 % de U_b;+0,28 p.p. fora da faixa;S;"U_b = 12.681 m/s (DNS ≈ 14,7); Cf = 1.244e-02 (ref. 9,38e-3)"
+H-duto;R34;|V_s|máx/U_b [%];1.54113;Pirozzoli et al. (2018): 1–2 % de U_b;dentro da faixa;S;"U_b = 13.925 m/s (DNS ≈ 14,7); Cf = 1.031e-02 (ref. 9,38e-3)"
+H-degrau;R35;x_r/H;5.85766;6,26 ± 0,10 (Driver e Seegmiller, 1985);−6,4 %;S;"Cf_rms = 3.25e-04; Cp_rms degrau/oposta = 0.042/0.031; 11161 iterações"
+H-degrau;R36;x_r/H;6.81214;6,26 ± 0,10 (Driver e Seegmiller, 1985);+8,8 %;S;"Cf_rms = 3.46e-04; Cp_rms degrau/oposta = 0.025/0.025; 10712 iterações"
+H-degrau;R37;x_r/H;6.20141;6,26 ± 0,10 (Driver e Seegmiller, 1985);−0,9 %;N;"Cf_rms = 2.50e-04; Cp_rms degrau/oposta = 0.026/0.025; 20000 iterações; NÃO convergiu"
+H-degrau;R38;x_r/H;6.8714;6,26 ± 0,10 (Driver e Seegmiller, 1985);+9,8 %;N;"Cf_rms = 3.12e-04; Cp_rms degrau/oposta = 0.023/0.023; 22000 iterações; NÃO convergiu"
+H-degrau;R39;x_r/H;7.03761;6,26 ± 0,10 (Driver e Seegmiller, 1985);+12,4 %;N;"Cf_rms = 3.34e-04; Cp_rms degrau/oposta = 0.022/0.022; 20000 iterações; NÃO convergiu"
+H-degrau;R40;x_r/H;5.348;6,26 ± 0,10 (Driver e Seegmiller, 1985);−14,6 %;N;"Cf_rms = 2.58e-04; Cp_rms degrau/oposta = 0.022/0.020; 20000 iterações; NÃO convergiu"
+H-degrau;R41;x_r/H;6.7767;6,26 ± 0,10 (Driver e Seegmiller, 1985);+8,3 %;S;"Cf_rms = 3.98e-04; Cp_rms degrau/oposta = 0.023/0.023; 768 iterações"
+H-degrau;R42;x_r/H;6.63114;6,26 ± 0,10 (Driver e Seegmiller, 1985);+5,9 %;S;"Cf_rms = 3.33e-04; Cp_rms degrau/oposta = 0.028/0.027; 10467 iterações"
+H-degrau;R43;x_r/H;7.39228;6,26 ± 0,10 (Driver e Seegmiller, 1985);+18,1 %;N;"Cf_rms = 3.81e-04; Cp_rms degrau/oposta = 0.024/0.019; 20000 iterações; NÃO convergiu"

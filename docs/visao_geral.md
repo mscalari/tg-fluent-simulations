@@ -25,6 +25,7 @@ A geometria e as malhas **não** são feitas por código: foram geradas manualme
 | **Degrau laminar** (backward-facing step) | Canal que se alarga de repente (degrau de 0,5 m). Atrás do degrau forma-se uma bolha de recirculação. | Comprimento de recolamento x_r |
 | **Duto quadrado 3D** | Seção de 1 × 1 m no plano xz, uma célula em y, periódico com gradiente de 4 Pa/m (Re_τ = 150). Modelos de turbulência e, com SST, esquemas de pressão. | Pirozzoli et al. (2018), só ordem de grandeza |
 | **Degrau turbulento** | Driver e Seegmiller (1985), Re_H = 36 000, expansão 9/8, entrada lei 1/7. | x_r/H = 6,26 ± 0,10, Cf e Cp de `refs/bfs_driver1985.csv` |
+| **Conversor de torque CT_V1** (fora de R01–R43) | Bomba, turbina e estator em 3D com MRF, 2000 rpm, óleo ρ = 830 kg/m³ e μ = 0,007 Pa·s, varredura da razão de velocidades SR. A geometria é dada: o TG valida o Fluent e o setup, não o conversor. | Tendências da literatura (TR, η, K), balanço de torque e de Euler, y⁺, sensibilidades e GCI |
 
 ## Blocos e execuções
 
@@ -39,14 +40,14 @@ A geometria e as malhas **não** são feitas por código: foram geradas manualme
 | G | `G_interp_pressao` | R18–R30 | Interpolação da pressão; R18–R20 sem rotação | 
 | H | `H_turbulencia` | R31–R43 | Modelos de turbulência: duto 3D (R31–R34) e degrau turbulento (R35–R43; R41 na BFYW, demais na BFY1) |
 
-A lista exata do que roda é o dicionário `CASES` em `tools/casos.py` (R01–R43). 
+A lista exata do que roda é o dicionário `CASES` em `tools/casos.py` (R01–R43). O conversor tem comandos próprios em `tools/conversor_mrf.py` e resultados em `results/conversor/` (ver `docs/como_rodar.md`, seção 7).
 
 Convenção de nomes: `<ID>_<CASO>_<MALHA>_<ALG>_<ESQ>[_<VAR>]`, por exemplo `R02_CPP_M2_SIM_SOU`.
 
 ## Organização das pastas
 
 ```
-mesh/            malhas de entrada (.msh): M1–M4, M2_io (CP), N040, N128 (cavidade), DEG15, DEG16 (degrau), DU040 (duto), BFY1, BFYW (degrau turbulento)
+mesh/            malhas de entrada (.msh): M1–M4, M2_io (CP), N040, N128 (cavidade), DEG15, DEG16 (degrau), DU040 (duto), BFY1, BFYW (degrau turbulento), CT_V1_3zonas*.msh.h5 (conversor; G0 e, no GCI, G1 e G2; fora do git)
 refs/            perfis de entrada (cp_inlet.prof original em y ∈ [0, 1]; cp_inlet_ymenos.prof espelhado, usado no R06; bfs_inlet.prof; bfy_inlet.prof, gerado por tools/gerar_bfy_inlet.py), bfs_driver1985.csv, duto_secundario.csv, o CSV de referência do R02 e ghia1982.csv (Ghia et al., Tabelas I e II, Re = 100)
 tools/           código (ver docs/codigo.md)
 results/<Bloco>/<nome da execução>/
@@ -55,6 +56,9 @@ results/<Bloco>/<nome da execução>/
   graficos/      _campos.png, _convergencia.png, _perfis.png
   logs/          run.log (saída do script) e transcrições .trn do Fluent
 docs/            esta documentação
+results/conversor/ conversor CT_V1: CT_V1_MRF (base), CT_V1_GCI, CT_V1_GCI_G1 e _G2 (ver como_rodar.md, seção 7.3)
+results/comparacao_blocos/  figuras-resumo de R01–R43 contra as referências (tools/comparacao_blocos.py)
+monitor/         painel local somente leitura (127.0.0.1:8765); fora do git
 ```
 
 O conteúdo de cada arquivo de saída está em [como_rodar.md](como_rodar.md#o-que-cada-arquivo-de-saída-contém).

@@ -1,0 +1,632 @@
+{
+ "sr": 0.0,
+ "it_ini": 0,
+ "it_fim": 1300,
+ "convergiu": true,
+ "deriva_media": {
+  "t_bomba": 0.0028728934302475156,
+  "t_turbina": 0.002844934609286444,
+  "t_estator": 0.0010259348056609653
+ },
+ "media_janela": {
+  "t_bomba": -23953.906158907223,
+  "t_turbina": 25483.26533712245,
+  "t_estator": -1616.8979808151298,
+  "t_total": -87.53880259989806,
+  "m_bomba_turbina_bomba": -294.30028064888813,
+  "h_bomba_turbina_bomba": 0.0,
+  "m_bomba_turbina_turbina": 294.30028064888813,
+  "h_bomba_turbina_turbina": 2273.4173429364905,
+  "m_turbina_estator_turbina": -294.34739148090915,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 294.34739148090915,
+  "h_turbina_estator_estator": 0.0,
+  "m_estator_bomba_estator": -294.27983698955046,
+  "h_estator_bomba_estator": -17.758067926598343,
+  "m_estator_bomba_bomba": 294.27983698955046,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "desvio_janela": {
+  "t_bomba": 254.49575592473735,
+  "t_turbina": 271.0180857943991,
+  "t_estator": 37.820359797546125,
+  "t_total": 225.3262136390239,
+  "m_bomba_turbina_bomba": 1.0798736188124076,
+  "h_bomba_turbina_bomba": 0.0,
+  "m_bomba_turbina_turbina": 1.0798736188124691,
+  "h_bomba_turbina_turbina": 55.10820423210348,
+  "m_turbina_estator_turbina": 0.8355005609616212,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 0.8355005609615881,
+  "h_turbina_estator_estator": 0.0,
+  "m_estator_bomba_estator": 0.9790443132735547,
+  "h_estator_bomba_estator": 0.07191825699729605,
+  "m_estator_bomba_bomba": 0.9790443132735432,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "janela": 200,
+ "tempo_s": 7027.0,
+ "reports": {
+  "t_bomba": -23953.906158907223,
+  "t_turbina": 25483.26533712245,
+  "t_estator": -1616.8979808151298,
+  "t_total": -87.53880259989806,
+  "m_bomba_turbina_bomba": -294.30028064888813,
+  "h_bomba_turbina_bomba": 0.0,
+  "m_bomba_turbina_turbina": 294.30028064888813,
+  "h_bomba_turbina_turbina": 2273.4173429364905,
+  "m_turbina_estator_turbina": -294.34739148090915,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 294.34739148090915,
+  "h_turbina_estator_estator": 0.0,
+  "m_estator_bomba_estator": -294.27983698955046,
+  "h_estator_bomba_estator": -17.758067926598343,
+  "m_estator_bomba_bomba": 294.27983698955046,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "setup": {
+  "variante": "meio_passo",
+  "descricao": "turbina girada de meio passo (10\u00b0) em rela\u00e7\u00e3o \u00e0 bomba e ao estator; setup refeito da malha",
+  "malha": "CT_V1_3zonas.msh.h5",
+  "sinal": 1,
+  "rpm_b": 2000.0,
+  "omega_b": 209.43951023931953,
+  "giro_turbina": {
+   "graus": 10.0,
+   "via": "settings"
+  },
+  "paredes_abs_ausentes": [],
+  "sobras": {
+   "sobra_if_bt_lado_bomba": "turbina",
+   "sobra_if_bt_lado_turbina": "bomba",
+   "sobra_if_te_lado_estator": "turbina",
+   "sobra_if_te_lado_turbina": "estator",
+   "sobra_if_eb_lado_bomba": "estator",
+   "sobra_if_eb_lado_estator": "bomba"
+  },
+  "interfaces": {
+   "if_bt": {
+    "name": "if_bt",
+    "zone1": [
+     "if_bomba_turbina_lado_turbina"
+    ],
+    "zone2": [
+     "if_bomba_turbina_lado_bomba"
+    ]
+   },
+   "if_te": {
+    "name": "if_te",
+    "zone1": [
+     "if_turbina_estator_lado_estator"
+    ],
+    "zone2": [
+     "if_turbina_estator_lado_turbina"
+    ]
+   },
+   "if_eb": {
+    "name": "if_eb",
+    "zone1": [
+     "if_estator_bomba_lado_estator"
+    ],
+    "zone2": [
+     "if_estator_bomba_lado_bomba"
+    ]
+   }
+  },
+  "adjacencia_paredes_lado": {
+   "parede_bomba_lado_turbina": "fluido_turbina",
+   "parede_bomba_lado_estator": "fluido_estator",
+   "parede_estator_lado_turbina": "fluido_turbina",
+   "parede_estator_lado_bomba": "fluido_bomba"
+  },
+  "rotacao": {
+   "frames": {
+    "fluido_bomba": {
+     "frame_motion": true,
+     "mrf_relative_to_thread": "absolute",
+     "mrf_omega": {
+      "option": "value",
+      "value": 209.43951023931953
+     },
+     "reference_frame_velocity": [
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0
+      }
+     ],
+     "reference_frame_axis_origin": [
+      {
+       "option": "value",
+       "value": 0.0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      }
+     ],
+     "reference_frame_axis_direction": [
+      {
+       "option": "value",
+       "value": 1.0
+      },
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      }
+     ],
+     "reference_frame_zone_motion_function": "none"
+    },
+    "fluido_turbina": {
+     "frame_motion": true,
+     "mrf_relative_to_thread": "absolute",
+     "mrf_omega": {
+      "option": "value",
+      "value": 0
+     },
+     "reference_frame_velocity": [
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0
+      }
+     ],
+     "reference_frame_axis_origin": [
+      {
+       "option": "value",
+       "value": 0.0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      }
+     ],
+     "reference_frame_axis_direction": [
+      {
+       "option": "value",
+       "value": 1.0
+      },
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      }
+     ],
+     "reference_frame_zone_motion_function": "none"
+    },
+    "fluido_estator": {
+     "frame_motion": false,
+     "reference_frame_axis_origin": [
+      {
+       "option": "value",
+       "value": 0.0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      },
+      {
+       "option": "value",
+       "value": 0.0
+      }
+     ],
+     "reference_frame_axis_direction": [
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 0
+      },
+      {
+       "option": "value",
+       "value": 1
+      }
+     ]
+    }
+   },
+   "paredes_abs": {
+    "parede_bomba_lado_turbina": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 209.43951023931953
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "parede_bomba_lado_estator": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 209.43951023931953
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "parede_estator_lado_turbina": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 0
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "parede_estator_lado_bomba": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 0
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "sobra_if_bt_lado_bomba": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 0
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "sobra_if_bt_lado_turbina": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 209.43951023931953
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "sobra_if_te_lado_estator": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 0
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "sobra_if_te_lado_turbina": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 0
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "sobra_if_eb_lado_bomba": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 0
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    },
+    "sobra_if_eb_lado_estator": {
+     "motion_bc": "Moving Wall",
+     "shear_bc": "No Slip",
+     "relative": false,
+     "rotating": true,
+     "components": false,
+     "omega": {
+      "option": "value",
+      "value": 209.43951023931953
+     },
+     "rotation_axis_origin": [
+      0,
+      0,
+      0
+     ],
+     "rotation_axis_direction": [
+      1.0,
+      0,
+      0.0
+     ]
+    }
+   }
+  },
+  "grupos_torque": {
+   "bomba": [
+    "parede_bomba",
+    "parede_bomba_lado_turbina",
+    "parede_bomba_lado_estator",
+    "sobra_if_bt_lado_turbina",
+    "sobra_if_eb_lado_estator"
+   ],
+   "turbina": [
+    "parede_turbina",
+    "sobra_if_bt_lado_bomba",
+    "sobra_if_te_lado_estator"
+   ],
+   "estator": [
+    "parede_estator",
+    "parede_estator_lado_turbina",
+    "parede_estator_lado_bomba",
+    "sobra_if_te_lado_turbina",
+    "sobra_if_eb_lado_bomba"
+   ]
+  },
+  "reports": [
+   "t_bomba",
+   "t_turbina",
+   "t_estator",
+   "t_total",
+   "m_bomba_turbina_bomba",
+   "h_bomba_turbina_bomba",
+   "m_bomba_turbina_turbina",
+   "h_bomba_turbina_turbina",
+   "m_turbina_estator_turbina",
+   "h_turbina_estator_turbina",
+   "m_turbina_estator_estator",
+   "h_turbina_estator_estator",
+   "m_estator_bomba_estator",
+   "h_estator_bomba_estator",
+   "m_estator_bomba_bomba",
+   "h_estator_bomba_bomba"
+  ],
+  "general": {
+   "solver": {
+    "type": "pressure-based",
+    "velocity_formulation": "relative",
+    "time": "steady"
+   },
+   "operating_conditions": {
+    "gravity": {
+     "enable": false
+    },
+    "operating_pressure": 101325,
+    "reference_pressure_location": [
+     -0.03,
+     0.3,
+     0.0
+    ],
+    "reference_pressure_method": "Connected and disconnected fluid zones"
+   },
+   "units": {}
+  },
+  "viscous": {
+   "model": "k-omega",
+   "k_omega_model": "sst",
+   "k_omega_options": {
+    "kw_low_re_correction": false
+   },
+   "near_wall_treatment": {
+    "wall_omega_treatment": "correlation"
+   },
+   "transition_module": "none",
+   "options": {
+    "curvature_correction": true,
+    "corner_flow_correction": false,
+    "production_kato_launder_enabled": false,
+    "production_limiter": {
+     "enabled": true,
+     "clip_factor": 10.0
+    }
+   },
+   "turbulence_expert": {
+    "turb_non_newtonian": false,
+    "restore_sst_v61": false
+   },
+   "user_defined": {
+    "turb_visc_func": "none"
+   }
+  },
+  "methods": {
+   "p_v_coupling": {
+    "flow_scheme": "SIMPLE"
+   },
+   "flux_type": {
+    "pbns_cases": {
+     "flux_auto_select": true
+    }
+   },
+   "discretization_scheme": {
+    "k": "second-order-upwind",
+    "mom": "second-order-upwind",
+    "omega": "second-order-upwind",
+    "pressure": "presto!"
+   },
+   "pseudo_time_method": {
+    "formulation": {
+     "segregated_solver": "off"
+    }
+   },
+   "expert": {
+    "numerics_pbns": {
+     "implicit_bodyforce_treatment": false,
+     "velocity_formulation": "relative",
+     "physical_velocity_formulation": false,
+     "disable_rhie_chow_flux": false,
+     "presto_pressure_scheme": false,
+     "first_to_second_order_blending": 1.0
+    }
+   },
+   "gradient_scheme": "least-square-cell-based",
+   "high_order_term_relaxation": {
+    "enable": false
+   },
+   "warped_face_gradient_correction": {
+    "enable": true,
+    "mode": "fast"
+   }
+  },
+  "init": {
+   "initialization_type": "standard",
+   "reference_frame": "absolute",
+   "defaults": {
+    "k": 1,
+    "omega": 500.0,
+    "pressure": 0,
+    "x-velocity": 0,
+    "y-velocity": 0,
+    "z-velocity": 0
+   },
+   "patch": {},
+   "fmg": {
+    "fmg_courant_number": 0.75,
+    "enable_fmg_verbose": true
+   }
+  },
+  "urf": {
+   "body-force": 1.0,
+   "density": 1,
+   "k": 0.8,
+   "mom": 0.7,
+   "omega": 0.8,
+   "pressure": 0.3,
+   "turb-viscosity": 1
+  },
+  "rho": 830.0,
+  "mu": 0.007,
+  "pyfluent": "0.37.2"
+ },
+ "unidade_torque": "N\u00b7m",
+ "paredes_zona": {
+  "fluido_bomba": -24548.51015424617,
+  "fluido_turbina": 25508.90099499544,
+  "fluido_estator": -1553.549775206395
+ }
+}

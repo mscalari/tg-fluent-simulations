@@ -621,6 +621,8 @@ def validar_zonas(m, nivel):
     Returns:
         dict: ``n_face_zones``, ``faces_por_zona`` e ``texto_cell_zones`` (listagem crua das cell zones).
 
+    Cell zones com sufixo numérico (``fluido_turbina_18``, deixado pelo merge) contam como presentes, com aviso.
+
     Raises:
         RuntimeError: Se faltar cell zone ou face zone obrigatória, ou sobrar zona com nome de origem.
     """
@@ -629,9 +631,14 @@ def validar_zonas(m, nivel):
     _, zonas = contar_faces(fac)
     faces = {z[0]: z[2] for z in zonas}
     obrig = [n for n in FACE_ZONES_ESPERADAS if n not in ZONAS_PEQUENAS]
-    faltam = [n for n in CELL_ZONES if not re.search(rf"\b{n}\b", cel)]
+    # O merge "fluido_<peça>*" pode manter o nome de uma das zonas juntadas (``fluido_turbina_18`` na G1):
+    # é só nome; conversor_mrf.normalizar_zonas renomeia no solver. Aceito com AVISO.
+    sufixadas = sorted(set(re.findall(r"\b(fluido_(?:bomba|turbina|estator)_\d+)\b", cel)))
+    if sufixadas:
+        log(f"AVISO: cell zones com sufixo em {nivel}: {sufixadas} (normalizadas no solver pelo conversor_mrf.py)")
+    faltam = [n for n in CELL_ZONES if not re.search(rf"\b{n}(?:_\d+)?\b", cel)]
     faltam += [n for n in obrig if n not in faces]
-    sobras = sorted(set(re.findall(r"\b(?:stlb_\S+|interface_\S+|fluido_\S+_\d\d\S*|origin-\S+)", cel + fac)))
+    sobras = sorted(set(re.findall(r"\b(?:stlb_\S+|interface_\S+|origin-\S+)", cel + fac)))
     if faltam or sobras:
         raise RuntimeError(f"Zonas de {nivel} diferentes da G0: faltam {faltam}; sobram {sobras[:6]}")
     for n in ZONAS_PEQUENAS:

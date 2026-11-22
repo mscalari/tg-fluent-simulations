@@ -11,7 +11,8 @@ Casos cobertos:
   acoplamento pressão-velocidade e interpolação da pressão;
 - **degrau** (backward-facing step) laminar;
 - **duto quadrado 3D** periódico, com modelos RANS (escoamento secundário);
-- **degrau turbulento** de Driver e Seegmiller (1985), com modelos RANS.
+- **degrau turbulento** de Driver e Seegmiller (1985), com modelos RANS;
+- **conversor de torque CT_V1** (3D, MRF), com varredura da razão de velocidades, sensibilidades e GCI (seção abaixo).
 
 O plano completo tem 43 execuções (R01–R43) em 8 blocos (A–H), todas definidas em `tools/casos.py`
 (a cavidade rotativa R21–R27 roda em 2D, com Frame Motion).
@@ -75,25 +76,72 @@ que o valor absoluto de x_r. Nas rodadas que não atingiram 1e-6, a continuidade
 
 ## Conversor de torque CT_V1 (MRF)
 
-Simulação 3D do conversor (bomba, turbina e estator; 1,9 M células; malha `mesh/CT_V1_3zonas.msh.h5`,
-fora do git) com referenciais múltiplos (MRF), k-ω SST com correção de curvatura, PRESTO! e SIMPLE.
-A bomba gira a 2000 rpm em torno de +x e a turbina a SR·ω_b; o estator fica parado.
+Simulação 3D do conversor (bomba, turbina e estator; malha G0 de 1 900 736 células, `mesh/CT_V1_3zonas.msh.h5`,
+fora do git) com referenciais múltiplos (MRF). A geometria CT_V1 é dada: o TG valida o Fluent e o setup, não o
+conversor. A bomba gira a 2000 rpm em torno de +x (sentido escolhido pelo teste de SR = 0: só nele TR > 1) e a
+turbina a SR·ω_b; o estator fica parado. Óleo com ρ = 830 kg/m³ e μ = 0,007 Pa·s.
+
+**Setup:** k-ω SST com correção de curvatura, PRESTO!, SIMPLE (o Coupled não cabe nos 16 GB de RAM desta malha),
+segunda ordem, formulação de velocidade relativa, inicialização standard no referencial absoluto. Cada ponto de
+operação para quando a média dos torques em janelas de 200 iterações varia menos que 0,5 % (TOL) entre janelas
+vizinhas; o valor oficial é essa média, e o desvio dentro da janela é a incerteza iterativa. Os torques saem em N·m:
+no report de momento da 24.1, a opção `Drag Force` já é o momento dimensional (`Drag Coefficient` = Cm; M = 0,6125·Cm
+com os valores de referência padrão).
 
 ```bash
 export PYTHONIOENCODING=utf-8
-.venv241/Scripts/python.exe tools/conversor_mrf.py sentido 500     # SR = 0 nos dois sentidos de rotação
-.venv241/Scripts/python.exe tools/conversor_mrf.py varredura 1     # SR = 0 … 0,9, cada ponto parte do anterior
-.venv241/Scripts/python.exe tools/conversor_mrf.py refazer_figuras # relê o .cas/.dat de cada ponto e refaz as imagens
-.venv241/Scripts/python.exe tools/analise_conversor.py             # gráficos, curvas TR/η/K, Euler e nota do Obsidian
+.venv241/Scripts/python.exe tools/conversor_mrf.py setup                     # monta o caso e grava o .cas de setup
+.venv241/Scripts/python.exe tools/conversor_mrf.py sentido 500               # SR = 0 nos dois sentidos de rotação
+.venv241/Scripts/python.exe tools/conversor_mrf.py varredura 1               # SR = 0 … 0,9, cada ponto parte do anterior
+.venv241/Scripts/python.exe tools/conversor_mrf.py varredura 1 0.9 0.95 1.0 --ini <.dat.h5 do ponto anterior>
+.venv241/Scripts/python.exe tools/conversor_mrf.py sensibilidade             # sst_sem_cc ke_realizable fou meio_passo (coupled à parte)
+.venv241/Scripts/python.exe tools/conversor_mrf.py refazer_figuras 0 0.4     # relê .cas/.dat e refaz as imagens do Fluent
+# malhas do GCI: --malha mesh/CT_V1_3zonas_G1.msh.h5 --saida CT_V1_GCI_G1 (vale para qualquer comando)
 ```
 
-Saídas em `results/conversor/CT_V1_MRF/SRxxx/{fluent,dados,graficos}`: cerca de 60 imagens do Fluent por
-ponto (plano meridional, cortes axiais, raios constantes, pás, interfaces, linhas de corrente, critério Q)
-mais monitores, resíduos, y⁺ e perfis nas interfaces (matplotlib); curvas globais em `CT_V1_MRF/graficos`.
-O Coupled não cabe nos 16 GB de RAM desta malha (swap); por isso SIMPLE. Os torques oscilam ~1,5 % sem
-deriva: o ponto para quando a média de 200 iterações estabiliza, e os valores são essas médias.
-Na varredura as imagens do Fluent saem em branco (só a legenda): a janela gráfica fica presa aos plots
-de monitor. Por isso as figuras são refeitas depois, relendo o caso de cada ponto numa sessão nova.
+Saídas em `results/conversor/CT_V1_MRF/SRxxx/{fluent,dados,graficos}`: cerca de 60 imagens do Fluent por ponto
+(plano meridional, cortes axiais, raios constantes, pás, interfaces, linhas de corrente, critério Q), monitores,
+resíduos, y⁺ e perfis nas interfaces (matplotlib). Resultados globais em `CT_V1_MRF/{dados,graficos}`. Na
+varredura as imagens do Fluent saem em branco (a janela gráfica fica presa aos plots de monitor), por isso
+`refazer_figuras` as refaz depois, numa sessão nova. Os `.cas/.dat` e os exports por face ficam fora do git.
+
+### Análises sem Fluent
+
+Rodam sobre o que já está em `results/conversor/` (todas com `.venv241` e `PYTHONIOENCODING=utf-8`). Detalhes de
+entradas e saídas em [docs/codigo.md](docs/codigo.md).
+
+| Script | O que faz | Saídas principais |
+|---|---|---|
+| `analise_conversor.py` | Curvas TR, η e K, torques, vazão e balanço; nota do Obsidian | `g1`–`g3`, `dados/desempenho.csv` |
+| `euler_interfaces_conversor.py` | Balanço de momento angular por zona contra o torque das paredes | `g7`, `dados/euler_interfaces*.csv` |
+| `analise_yplus_conversor.py` | y⁺ por faixas e peça, ponderado por área | `g4`, `dados/yplus_faixas.csv` |
+| `analise_sensibilidade_conversor.py` | Δ% de TR, T_b, T_t e K de cada variante contra o estol-base | `g6`, `dados/sensibilidade.csv` |
+| `comparacao_literatura_conversor.py` | Curvas adimensionais contra a literatura | `g5` |
+| `tendencia_derivada_conversor.py` | dTR/dSR, dη/dSR e dK/dSR com incerteza | `g8`, `dados/derivada_tendencia.csv` |
+| `tendencia_sinais_conversor.py` | Sinais e monotonicidade por intervalo de SR | `g9`, `dados/sinais_tendencia.csv` |
+| `tendencia_colapso_conversor.py` | Colapso adimensional da forma das curvas | `g10`, `dados/colapso_adimensional*.csv` |
+| `animacao_meio_passo.py` | GIF da turbina girada de meio passo (10°) | `graficos/animacao_meio_passo.gif` |
+| `gci_conversor.py` | GCI (Celik et al., 2008) com G0, G1 e G2 | `CT_V1_GCI/dados/gci.csv`, `graficos/gci_tr.png` |
+| `malha_gci_conversor.py` | Gera as malhas G1 e G2 (usa o Fluent Meshing) | `mesh/CT_V1_3zonas_G{1,2}.msh.h5` |
+| `imagens_malha_conversor.py` | Imagens das malhas G0, G1 e G2 e montagens lado a lado | `CT_V1_GCI/graficos/malha_*.png` |
+| `comparacao_blocos.py` | Figuras-resumo de R01–R43 contra as referências | `results/comparacao_blocos/` |
+
+### Independência de malha (GCI)
+
+Malhas G1 e G2 por semelhança geométrica com a G0, com fatores nominais 1,35 e 1,8225. A calibração pela
+superfície da G1 deu r efetivo = 1,308 (842 090 faces contra 1 440 968 da G0). Rodadas em SR = 0 e SR = 0,4 em
+`CT_V1_GCI_G1` e `CT_V1_GCI_G2`; `gci_conversor.py` usa p por raiz das equações de Celik, Fs conservador e o erro-padrão
+da média por batch means (p aparente acima de 1,1·p formal é limitado ao formal). A G1 e a G2 rodaram com URF
+menores (`--urf`). Resultado (22/11/2026): em SR 0 o TR não depende da malha dentro do ruído iterativo (1,065 / 1,062 /
+1,069; GCI21 0,49 %); em SR 0,4 os torques absolutos caem ~5 % por nível, fora da faixa assintótica, e o TR da G0
+(1,027) difere do da G1/G2 (1,015–1,016), diferença confundida com o protocolo (URF e caminho de SR). Os testes
+`CT_V1_GCI_G0_urf_reinicio` e `CT_V1_GCI_G0_urf` separam essas causas. Os `.cas/.dat` antigos da G0 estão em
+`D:\TG_backup_fluent\CT_V1_MRF\` (o C: encheu).
+
+### Monitor local
+
+A pasta `monitor/` (ignorada pelo git) tem um painel somente leitura em `http://127.0.0.1:8765/`, com processos do
+Fluent, RAM, logs, resultados e filas: `powershell -ExecutionPolicy Bypass -File monitor\abrir_monitor.ps1`.
 
 ## Documentação
 
@@ -101,4 +149,5 @@ de monitor. Por isso as figuras são refeitas depois, relendo o caso de cada pon
 |---|---|
 | [docs/visao_geral.md](docs/visao_geral.md) | O que o projeto valida, blocos e execuções, organização das pastas |
 | [docs/como_rodar.md](docs/como_rodar.md) | Ambiente, comandos, arquivos de saída, como adicionar uma execução, armadilhas |
-| [docs/codigo.md](docs/codigo.md) | Cada módulo e cada função de `tools/`, em linguagem simples |
+| [docs/codigo.md](docs/codigo.md) | Cada módulo de `tools/` (casos, runner, análises e o conversor), em linguagem simples |
+| [docs/handoff_proxima_sessao.md](docs/handoff_proxima_sessao.md) | Estado atual, o que está rodando, próximos passos e pendências |

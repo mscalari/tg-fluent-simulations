@@ -137,8 +137,17 @@ def desempenho(r):
         dict: SR, torques, TR, η, K, vazão, balanço e Euler por zona.
     """
     c = fator_torque(r)
-    conv = lambda dd: {k: (v * c if isinstance(v, (int, float)) and k.startswith(("t_", "z_")) else v)
-                       for k, v in dd.items()}
+    def conv(dd):
+        """Converte para N·m os valores ``t_*``/``z_*`` de um dicionário de reports.
+
+        Args:
+            dd (dict): Reports (chave -> valor).
+
+        Returns:
+            dict: Cópia com os torques multiplicados por ``c`` e o resto inalterado.
+        """
+        return {k: (v * c if isinstance(v, (int, float)) and k.startswith(("t_", "z_")) else v)
+                for k, v in dd.items()}
     f = conv(r["reports"])                 # médias das últimas JANELA iterações, em N·m
     fi = conv(r.get("reports_inst", r["reports"]))  # última iteração (Euler e torques por zona são instantâneos)
     if isinstance(fi.get("paredes_zona"), dict):
