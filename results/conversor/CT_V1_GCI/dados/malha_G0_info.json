@@ -1,0 +1,26 @@
+{
+  "nivel": "G0",
+  "malha": "CT_V1_3zonas.msh.h5",
+  "processos": 2,
+  "pids": [
+    19040,
+    25120
+  ],
+  "imagens": {
+    "01_meridional": true,
+    "02_zoom_if_bomba_turbina": true,
+    "03_zoom_estator": true,
+    "04_zoom_if_estator_bomba": true,
+    "05_corte_x_bomba": true,
+    "06_zoom_corte_x_bomba": true,
+    "07_superficie_turbina": true,
+    "08_superficie_estator": true,
+    "09_superficie_bomba": true,
+    "10_zoom_superficie_bomba": true
+  },
+  "celulas": 1900736,
+  "faces": 11138436,
+  "nos": 8233079,
+  "tempo_s": 109.2,
+  "ram_sessao_mb_max": 1709
+}

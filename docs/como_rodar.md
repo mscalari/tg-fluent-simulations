@@ -2,6 +2,8 @@
 
 ## 1. Ambiente
 
+O conversor CT_V1 (seção 7) usa o mesmo ambiente. Para os casos R01–R43, siga as seções 1 a 6.
+
 | Item | Valor |
 |---|---|
 | Fluent | Ansys 2024 R1 (versão 24.1), instalado em `D:\ansys\ANSYS Inc\v241` |
@@ -201,3 +203,153 @@ Métricas por tipo de caso (`_metricas.json`):
 - **make-periodic a cada malha.** A periodicidade é refeita pelo runner sempre que lê a malha do CP
   (a malha sai do Workbench com `periodic_a`/`periodic_b` como paredes).
 - **Console em cp1252.** Sem `PYTHONIOENCODING=utf-8`, imprimir "−" ou "ū" quebra o script.
+
+## 7. Conversor CT_V1 (MRF)
+
+Comandos no Git Bash, na raiz, com `export PYTHONIOENCODING=utf-8` e `.venv241/Scripts/python.exe`. O conversor é 3D,
+com ~1,9 M de células: **uma sessão do Fluent por vez** (~9,4 GB de RAM na G0, numa máquina de 16 GB). Não rode
+outro Fluent enquanto uma fila estiver ativa (ver o painel em `monitor/`).
+
+### 7.1 Rodar no Fluent
+
+```bash
+python tools/conversor_mrf.py setup                          # monta o caso e testa as imagens
+python tools/conversor_mrf.py sentido 500                    # SR = 0 em +x e −x (escolhido: +x)
+python tools/conversor_mrf.py varredura 1                    # SR 0 … 0,9, cada ponto parte do anterior
+python tools/conversor_mrf.py varredura 1 0.9 0.95 1.0 --ini results/conversor/CT_V1_MRF/SR090/fluent/<...>.dat.h5
+# atenção: o --ini não carrega o .dat de outra sessão (o setup altera a malha); o 1º ponto parte do zero
+# ("The mesh has been modified. Previously saved data files are incompatible"). Procure essa frase no log.
+python tools/conversor_mrf.py sensibilidade                  # sst_sem_cc ke_realizable fou meio_passo
+python tools/conversor_mrf.py sensibilidade coupled --malha mesh/CT_V1_3zonas_G2.msh.h5 --saida CT_V1_GCI_G2
+python tools/conversor_mrf.py refazer_figuras 0 0.2          # uma sessão por chamada; use poucos SR por vez
+python tools/malha_gci_conversor.py G1 --so-superficie       # calibração da superfície (~30 min)
+python tools/malha_gci_conversor.py G1 --retomar-superficie  # volume a partir da superfície gravada
+python tools/malha_gci_conversor.py G2                       # do STL
+python tools/conversor_mrf.py varredura 1 0 0.4 --malha mesh/CT_V1_3zonas_G1.msh.h5 --saida CT_V1_GCI_G1     --urf mom=0.5,k=0.6,omega=0.6,turb-viscosity=0.8          # URF menores: a G1 divergiu com as padrão
+python tools/imagens_malha_conversor.py G2 G1 G0             # 10 vistas por malha + montagens G2 | G1 | G0
+python tools/imagens_malha_conversor.py --so-montagem        # só refaz as montagens a partir dos PNGs
+```
+
+`--urf chave=valor,...` aplica sub-relaxações extras em `solution.controls.under_relaxation` logo depois de escolher o
+SIMPLE (vale para qualquer comando). `iterar_ponto` para o ponto com `RuntimeError` se um torque não for finito, passar
+de `T_DIVERGE` (10⁶ N·m) ou se, depois de 2 blocos, |soma dos torques| > 0,5·|T_b| (guarda de divergência; antes a G1
+divergiu e gastou horas iterando lixo).
+
+`--malha` e `--saida` valem para qualquer comando e mantêm os resultados da malha base intactos. Cada ponto grava
+`SRxxx/dados/resultado.json` com as médias da janela, o desvio e `conv`; os `.cas/.dat` ficam em `SRxxx/fluent/`.
+
+Duração típica na G0: ~4,5 s/iteração com SIMPLE; o teto é de 3000 iterações no 1º ponto e 2000 nos demais. O Fluent
+roda sem GUI (`UIMode.NO_GUI`), inclusive para as imagens.
+
+**Lançar filas longas.** Processos iniciados pelo Bash morrem quando o Claude Code reinicia (a fila 3 caiu assim). Para
+uma fila que deve sobreviver, lance desacoplada pelo WMI e registre o estado num arquivo de status:
+
+```powershell
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+  CommandLine = '"C:\Program Files\Git\bin\bash.exe" -l "C:\caminho\da\fila.sh"';
+  CurrentDirectory = 'C:\Users\murilo\Repositorios\03 - TG\tg-fluent-simulations' }
+```
+
+A fila começa com `cd` para a raiz do repositório. Ao gravar o código de saída no status, guarde `rc=$?` numa
+variável **antes** de montar a linha: em `echo "[$(date +%T)] passo rc=$?"` o `$(date)` zera o `$?` e o status
+mostra sempre `rc=0` (aconteceu na fila 6; confira o resultado pelo log do passo).
+
+**Disco.** Cada ponto da G0 grava ~700 MB de `.cas/.dat` (G1 ~340 MB, G2 ~190 MB). Em 22/11/2026 o C: (223 GB)
+encheu e o Fluent caiu no `write_case_data` (HDF5-DIAG, "Connection reset"), perdendo o resultado da G1. Os casos que
+as filas não usam mais foram movidos (não apagados) para `D:\TG_backup_fluent\CT_V1_MRF\` com a mesma estrutura
+(`robocopy ... *.cas.h5 *.dat.h5 /MOV`); `--ini` aceita o caminho no D:. As filas conferem o espaço livre antes de cada
+passo e pulam o passo com menos de 8 GB. Até a fila 10, esse teste nunca pulava nada: o PowerShell devolve o número com
+vírgula decimal ("3,5") e o `awk` não comparava; agora o valor passa por `tr ',' '.'`. O C: encheu duas vezes na G0
+porque o `pagefile.sys` cresce quando a RAM (16 GB) aperta: foi de 20,6 para 26,2 GB com o Fluent (~6,6 GB) e o Chrome
+(~3,5 GB) abertos. Rode a G0 com pelo menos 8 GB livres no C: e o mínimo de programas abertos.
+Em 22/11/2026, os CSVs fora do git, as malhas `.msh.h5`, os logs e os `.trn` foram movidos para `D:\TG_backup_drive`
+(veja o `LEIAME.md` de lá). Para rodar de novo, traga a malha de volta para `mesh/`.
+
+Entre passos da fila, confira e limpe `fluent.exe`/`cx2410.exe`/`fl_mpi2410.exe` órfãos pela árvore de PIDs da
+sessão, nunca por nome.
+
+### 7.2 Analisar
+
+```bash
+python tools/analise_conversor.py                  # desempenho.csv, g1–g3, nota do Obsidian (--sem-nota: só gráficos)
+python tools/euler_interfaces_conversor.py         # g7 (aceita SR em %: 0 20 60)
+python tools/analise_yplus_conversor.py            # g4
+python tools/analise_sensibilidade_conversor.py    # g6
+python tools/comparacao_literatura_conversor.py    # g5
+python tools/tendencia_derivada_conversor.py       # g8
+python tools/tendencia_sinais_conversor.py         # g9
+python tools/tendencia_colapso_conversor.py        # g10
+python tools/animacao_meio_passo.py                # GIF do meio passo
+python tools/gci_conversor.py                      # GCI (diz o que falta se G1/G2 não existirem)
+python tools/comparacao_blocos.py                  # R01–R43 contra as referências (results/comparacao_blocos/)
+```
+
+Entradas e saídas de cada script: `docs/codigo.md`. As análises dependem de `desempenho.csv` (gerado por
+`analise_conversor.py`, que deve rodar primeiro) e dos report files `dados/*.out`.
+
+### 7.3 Estrutura das saídas
+
+```
+results/conversor/CT_V1_MRF/
+  SR000 … SR090/{fluent,dados,graficos}   um ponto de operação por pasta (SR040 = SR 0,4)
+  dados/        report files (*.out), desempenho.csv, sensibilidade.csv, yplus_faixas.csv, euler_interfaces*.csv,
+                derivada_tendencia.csv, sinais_tendencia.csv, colapso_adimensional*.csv, setup.json
+  graficos/     g1–g10, animacao_meio_passo.gif
+  sens/<variante>/   sst_sem_cc, ke_realizable, fou, meio_passo
+results/conversor/CT_V1_GCI/            logs e parâmetros das malhas G1/G2, dados/gci.csv, graficos/gci_tr.png
+results/conversor/CT_V1_GCI_G1|G2/      rodadas de SR 0 e 0,4 nas malhas G1 e G2 (mesma estrutura da base)
+results/comparacao_blocos/              figuras-resumo de R01–R43 e resumo.csv
+```
+
+`.cas/.dat`, `.h5` e os exports por face (`SR*/dados/*.csv`) ficam fora do git (GB). O `.gitignore` também exclui
+`monitor/`, as malhas `mesh/*.msh.h5` e os `*_workflow_files` (exceto o `.wft`).
+
+### 7.4 Lições do Fluent 24.1 sem GUI
+
+- **Câmera.** Só funciona `views.restore_view("front")` seguido de `camera.orbit(right=..., up=...)`. Ajustar
+  `camera.position/target` fora do eixo z ou chamar `views.auto_scale()` deixa a imagem em branco, só com a legenda.
+  `orbit(right=−90)` leva a câmera a +x (o rótulo `de_mais_x` das imagens segue isso; havia rótulos trocados, já
+  corrigidos). `camera(st, direita, cima)` e `VISTAS` em `conversor_mrf.py` aplicam isso.
+- **Imagens da varredura em branco.** Durante as iterações os plots de monitor prendem a janela gráfica. Por isso as
+  figuras vêm de `refazer_figuras`, que relê o `.cas/.dat` numa sessão nova.
+- **`st.file.write_mesh` não existe** nos settings da 24.1. Para girar uma zona (variante `meio_passo`), use
+  `mesh.modify_zones.rotate_zone(zone_names, rotation_angle, origin, axis)` logo depois de `read_mesh` e **antes**
+  de criar as interfaces (elas alteram a malha), sem gravar malha intermediária.
+- **`.dat` não volta num setup recriado do zero.** Criar interfaces altera a malha, e o Fluent recusa ler o `.dat`
+  ("The mesh has been modified"). Para retomar entre sessões, use `read_case_data` do caso gravado junto.
+- **Nome das cell zones depois do merge no Meshing.** `/mesh/manage/merge "fluido_turbina*"` mantém o nome de uma
+  das zonas juntadas: na G0 saiu `fluido_turbina`, nas malhas do GCI saiu `fluido_turbina_18` (e
+  `interior--fluido_turbina_18`). `conversor_mrf.normalizar_zonas` renomeia no solver logo depois de `read_mesh`:
+  `cell_zone_conditions.fluid.rename(novo, velho)` para as fluid e `boundary_conditions.set_zone_name(zonename=,
+  newname=)` para as interior (este último recusa as fluid: "api-rename-obj: Object is invalid").
+- **Paredes extras das malhas do GCI.** A G2 (e a G1) sai do Meshing com paredes `stlb_<...>.<n>...fluido_<zona>`
+  (pás de uma peça tocando o fluido de outra). `renomear_paredes_stl` as renomeia para `parede_<dono>[_k]_lado_<lado>`
+  (dono pelo sufixo `.n`: 1 bomba, 2 estator, 3 turbina) e `sincronizar_paredes_abs` refaz `PAREDES_ABS` a partir das
+  paredes da malha/caso lido, para que elas girem com a peça dona e entrem no torque dela.
+- **Zonas interior das interfaces** (`if_bt`, `if_te`, `if_eb`) são recusadas como superfície de report e de
+  exportação ("Values contain disallowed entries"). Use os dois lados de cada interface (`_euler_<lado>.csv`).
+- **O TUI `/define/mesh-interfaces/create` entra em laço infinito.** Use `setup.mesh_interfaces.interface.create(nome)`
+  e `interface[nome].zone_names = [lado1, lado2]`.
+- **Report file não é sobrescrito** se já tiver linhas além da iteração atual: o Fluent cria `<nome>_<it+1>.out` e o
+  script continua lendo o antigo (a sensibilidade travou assim). Use um report file por variante
+  (`CT_V1_MRF_sens_<variante>_<data>.out`); `iterar_ponto` levanta erro se um bloco não acrescentar linhas.
+- **O `.out` do report file fica aberto pelo Fluent** (`Path.replace` falha com WinError 32): grave o caso antes e
+  copie o `.out`.
+- **Trocar para k-ε põe k e ε em primeira ordem sozinho.** Depois de mudar o modelo, force `second-order-upwind` em
+  tudo, exceto na pressão (a variante `fou` é a exceção).
+- **Momento em N·m.** Na 24.1 o report de momento oferece `['Drag Coefficient', 'Drag Force']`; `Drag Force` é o
+  momento em N·m e vale 0,6125 × Cm (valores de referência padrão: ρ = 1,225, v = A = L = 1). Escolha a opção sem
+  "coef" (`momento_em_nm`).
+- **`expr:lx` e velocidade relativa.** O campo `expr:lx` (named expression) foi recusado como campo de report;
+  `rel-tangential-velocity` é relativa à zona de referência (ω_b) em todas as zonas.
+- **Coupled não cabe na G0** (~17,6 GB de memória privada em 16 GB; swap a ~15 s/iteração). Por isso SIMPLE; o
+  Coupled só roda na G2 (variante `coupled`).
+- **Travamentos de imagem.** O Fluent já deu erro interno do Scheme (`wta(1st) to string->symbol`) e travou numa
+  figura do SR 0,9; e caiu ("disconnected") na exportação Euler depois de 4 pontos na mesma sessão. Grave
+  `resultado.json` antes das figuras e use uma sessão por ponto em `refazer_figuras`.
+- **Checkpoint nativo.** Criar `check-fluent.txt` no diretório de trabalho faz o Fluent gravar `.cas/.dat` na
+  iteração seguinte sem parar.
+- **`session.exit()` não encerra o Fluent 24.1**: use `run_caso.encerrar()` e confira que não ficaram
+  `fluent.exe`/`cx2410.exe`/`fl_mpi2410.exe`. Rode sempre com `PYTHONIOENCODING=utf-8`.
+- **Torque nas paredes `sobra_*`.** As faces sem par das interfaces viram paredes que giram com a peça do outro lado
+  e entram no torque dela; no SR000 o maior efeito é 1,3 % de |T_b|.

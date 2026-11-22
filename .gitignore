@@ -6,3 +6,16 @@ venv
 logs/
 *.log
 *.bak
+
+# Interface local de monitoramento (somente leitura)
+monitor/
+
+# Conversor (MRF): malhas, casos do Fluent e exports por face ficam fora (GB); só o .wft das malhas entra
+mesh/*.msh.h5
+mesh/*_workflow_files/*
+!mesh/*_workflow_files/*.wft
+results/conversor/**/fluent/
+results/conversor/**/*.h5
+results/conversor/**/SR*/dados/*.csv
+results/conversor/**/sens/*/dados/*.csv
+results/conversor/**/teste_figuras/dados/

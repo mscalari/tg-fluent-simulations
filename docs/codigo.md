@@ -10,6 +10,8 @@ casos.py ──► run_caso.py ──► results/<bloco>/<nome>/{fluent,dados,lo
 gerar_bfy_inlet.py: refs/bfy_inlet.prof
 ```
 
+O conversor CT_V1 (MRF) e as suas análises estão na segunda metade deste arquivo, a partir de "Conversor de torque CT_V1 (MRF)".
+
 | Arquivo | Papel | Abre o Fluent? |
 |---|---|---|
 | `casos.py` | Tabela das execuções e dos parâmetros físicos | não |
@@ -18,6 +20,9 @@ gerar_bfy_inlet.py: refs/bfy_inlet.prof
 | `rodar_fila.sh` | Roda uma fila com teto de Fluents simultâneos e retoma casos de `.cas/.dat` | **sim** (via `run_caso.py`) |
 | `analise_caso.py` | Métricas e gráficos | não |
 | `gerar_bfy_inlet.py` | Gera `refs/bfy_inlet.prof` (lei 1/7 nas duas paredes, δ = 1,4H, x = −10) | não |
+| `status.py` | Painel ao vivo do lote, a partir do `run.log` (`python tools/status.py R31 R32 ...`); local, fora do git | não |
+| `check_msh.py`, `msh_bordas_qualidade.py` | Conferência de malhas `.msh`; locais, fora do git | não |
+| `notas_obsidian.py`, `hipoteses_gh.py` | Registro `registro_pyfluent.csv` e notas do Obsidian por rodada (`Rxx_<nome>.md`) | não (locais, fora do repositório) |
 
 ---
 
@@ -206,3 +211,150 @@ malhas estar disponível), depois gera os gráficos de cada uma.
 | `animacao(cid)` | Monta `graficos/<nome>_animacao.gif` com os quadros de `dados/anim/`: \|V\| em cores (escala do campo final) e vetores de direção, um quadro por bloco de iterações. | ID | caminho do GIF ou `None` |
 | `analisar(cid)` | `calcular` + `graficos` + `animacao`, e imprime o resumo. | ID | métricas |
 | `selftest()` | Confere que `ghia1982.csv` tem 17 + 17 pontos. Se existir o CSV local `refs/r02cpp_m2_sim_sou_campo.csv` (fora do repositório), calcula `metricas_cp` nele e confere ū = 4,3499, e_L2 = 0,2693 %, e∞ = 0,01249 m/s; sem ele, avisa que o teste foi parcial. | — | nada; `AssertionError` se divergir |
+
+---
+
+# Conversor de torque CT_V1 (MRF)
+
+Os scripts do conversor ficam separados do runner dos casos R01–R43: `conversor_mrf.py` e `malha_gci_conversor.py`
+são os que abrem o Fluent; as análises só leem arquivos já gravados. Tudo roda com `.venv241` e
+`PYTHONIOENCODING=utf-8`. Cada ponto de operação fica em `results/conversor/<saída>/SRxxx/{fluent,dados,graficos}`
+(`SR040` = SR 0,4; `SR085` = 0,85); a base é `CT_V1_MRF`, e as malhas do GCI usam `CT_V1_GCI_G1` e `CT_V1_GCI_G2`.
+
+```
+conversor_mrf.py ──► CT_V1_MRF/SRxxx/{fluent,dados,graficos}, dados/*.out, sens/<variante>/
+        │                         │
+        │                         ├─► analise_conversor.py ──► desempenho.csv, g1–g3, nota do Obsidian
+        │                         ├─► euler_interfaces_conversor.py (g7)    analise_yplus_conversor.py (g4)
+        │                         ├─► analise_sensibilidade_conversor.py (g6)
+        │                         ├─► comparacao_literatura_conversor.py (g5) ─► tendencia_{derivada,sinais,colapso} (g8–g10)
+        │                         └─► gci_conversor.py ◄── CT_V1_GCI_G1/G2 ◄── conversor_mrf.py --malha ... --saida ...
+malha_gci_conversor.py ──► mesh/CT_V1_3zonas_G1/G2.msh.h5   (Fluent Meshing)
+```
+
+| Arquivo | Papel | Abre o Fluent? |
+|---|---|---|
+| `conversor_mrf.py` | Setup MRF, varredura de SR, sensibilidades, figuras | **sim** |
+| `malha_gci_conversor.py` | Gera as malhas G1 e G2 do GCI | **sim** (Meshing) |
+| `analise_conversor.py` | Curvas globais, torque × Euler, nota do Obsidian | não |
+| `euler_interfaces_conversor.py` | Balanço de momento angular por zona | não |
+| `analise_yplus_conversor.py` | y⁺ por faixas e peça | não |
+| `analise_sensibilidade_conversor.py` | Efeito de cada variante do setup no estol | não |
+| `comparacao_literatura_conversor.py` | TR, η e K contra a literatura | não |
+| `tendencia_derivada_conversor.py`, `tendencia_sinais_conversor.py`, `tendencia_colapso_conversor.py` | Três testes de tendência | não |
+| `animacao_meio_passo.py` | GIF da turbina girada de meio passo | não |
+| `gci_conversor.py` | GCI de Celik et al. (2008) | não |
+| `imagens_malha_conversor.py` | 10 vistas por malha (G0, G1, G2) e montagens lado a lado | **sim** (2 processos, ≤ 1,7 GB) |
+| `comparacao_blocos.py` | Figuras-resumo de R01–R43 contra as referências | não |
+
+## `conversor_mrf.py`
+
+Opções globais, válidas em qualquer comando: `--malha <arquivo .msh.h5>` (padrão `mesh/CT_V1_3zonas.msh.h5`),
+`--saida <pasta em results/conversor>` (padrão `CT_V1_MRF`) e `--urf chave=valor,...` (sub-relaxação extra, global
+`URF`). Servem para rodar as malhas do GCI sem tocar na base. Funções acrescentadas para as malhas do GCI:
+`normalizar_zonas` (tira o sufixo `_NN` das zonas fluid e interior), `renomear_paredes_stl` (paredes `stlb_*` →
+`parede_<dono>_lado_<lado>`), `sincronizar_paredes_abs` (refaz `PAREDES_ABS` pelas paredes da malha; `PAREDES_ABS_G0`
+guarda as da G0) e `divergiu` (guarda de divergência chamada a cada bloco em `iterar_ponto`).
+
+| Comando | O que faz |
+|---|---|
+| `setup` | Monta o caso, testa imagens e grava `CT_V1_MRF_setup.cas.h5`. |
+| `sentido [N]` | SR = 0, N iterações em cada sentido do eixo (+x e −x). Escolhido: +x (TR > 1 e estator reagindo). |
+| `varredura S [SRs] [--ini X.dat.h5]` | S = +1 ou −1; SRs padrão: 0; 0,2; 0,4; 0,6; 0,7; 0,8; 0,85; 0,9. Cada ponto parte do anterior; `--ini` dá a partida do 1º. Grava `resultado.json` por ponto. **Limitação:** o `read_data` de um `.dat` gravado por outra sessão falha sem exceção ("The mesh has been modified. Previously saved data files are incompatible and cannot be read."), porque o setup altera a malha (interfaces e renomeação de zonas); o 1º ponto então parte da inicialização standard. Os pontos seguintes, na mesma sessão, partem do anterior normalmente. |
+| `sensibilidade [variantes]` | Variantes no SR = 0, em `<saída>/sens/<variante>`: `sst_sem_cc`, `ke_realizable` (funções de parede *scalable*), `fou` (1ª ordem em momento e turbulência), `meio_passo` (gira a zona da turbina 10° com `mesh.modify_zones.rotate_zone`, antes de criar as interfaces, e parte do repouso) e `coupled` (só em malha grossa, por RAM). Cada variante usa o seu próprio report file. |
+| `refazer_figuras [SRs]` | Relê o `.cas/.dat` de cada ponto numa sessão nova e refaz as imagens, a verificação Cm → N·m, o torque das paredes `sobra_*` e os exports Euler (os dois lados de cada interface). |
+| `figuras_teste <caso>` | Gera as imagens de um caso gravado (diagnóstico). |
+
+**Setup (`montar`).** Lê a malha (em mm, convertida para m), troca para `interface` as zonas das interfaces
+(`if_bt` bomba–turbina, `if_te` turbina–estator, `if_eb` estator–bomba; as faces sem par viram paredes
+`sobra_<if>_lado_<peça>`), liga o Frame Motion nas zonas de fluido, põe as paredes em movimento absoluto com a peça
+vizinha, cria os reports de torque por peça (`report_definitions.moment`) e de vazão, e define o modelo, os
+métodos e a inicialização: velocidade relativa (`velocity_formulation = "relative"`), k-ω SST com
+`curvature_correction`, PRESTO! na pressão, segunda ordem nas demais equações, SIMPLE, gradiente Least Squares Cell
+Based, resíduos só monitorados (a parada é pelos torques) e inicialização standard em referencial absoluto.
+
+**Critério de parada** (`iterar_ponto`, `convergiu`, `media_janela`): blocos de `BLOCO` = 100 iterações; para quando
+a média dos torques das últimas `JANELA` = 200 iterações varia menos que `TOL` = 0,5 % em relação às 200 anteriores
+(T_e relativo a |T_b|), com mínimo de 1000 (1º ponto) ou 600 iterações e teto de 3000 ou 2000. Os valores oficiais são
+essas médias, e o desvio na janela é a incerteza iterativa. Levanta `RuntimeError` se um bloco não acrescentar linhas ao
+report file.
+
+**Torque em N·m.** `momento_em_nm` escolhe, em `report_output_type.allowed_values()`, a opção sem "coef"
+(`Drag Force`); `corrigir_momentos` converte casos gravados antes da correção (M = 0,6125·Cm). Resultados novos
+gravam `unidade_torque = "N·m"`.
+
+**Funções principais.**
+
+| Função | O que faz |
+|---|---|
+| `abrir()` | Abre o Fluent 3D, dupla precisão, 6 processos, sem interface. |
+| `criar_interfaces`, `adjacencia`, `nome_lado` | Cria as três mesh interfaces e renomeia as paredes pela adjacência. |
+| `aplicar_rotacao`, `frame`, `girar_parede` | Frame Motion nas zonas e paredes rotativas para o SR dado. |
+| `setup_do_caso(st)` | Recupera `sobras` e `grupos_torque` de um caso lido (quando falta o `setup.json`). |
+| `montar(s, sinal)` | Setup completo (acima). |
+| `reports`, `torques_por_zona`, `finais` | Reports de torque e vazão e leitura dos valores. |
+| `camera`, `VISTAS`, `contorno`, `vetores`, `salvar`, `figuras` | Imagens do Fluent (ver armadilhas em `como_rodar.md`). |
+| `exportar`, `verificar_ponto` | Exports ASCII (campo, paredes com área, lados das interfaces) e verificação no Fluent. |
+| `cmd_*` | Um comando de linha de comando por função (`cmd_varredura`, `cmd_sensibilidade`, `cmd_refazer_figuras`, ...). |
+| `opcoes_globais(argv)` | Trata `--malha` e `--saida`. |
+
+Em malhas grossas, as paredes de `PAREDES_ABS` que não existirem (zonas pequenas somem) são removidas com aviso.
+
+## Análises (sem Fluent)
+
+Convenções: CSVs com `;` como separador; figuras `g1`…`g10` em `results/conversor/CT_V1_MRF/graficos/`, tabelas em
+`.../dados/`. Torques gravados em Cm são convertidos para N·m por `analise_conversor.fator_torque`.
+TR = −T_t/T_b, η = SR·TR, K = n_b/√|T_b| (n_b em rpm).
+
+| Script | Como rodar | Entradas | Saídas |
+|---|---|---|---|
+| `analise_conversor.py` | `python tools/analise_conversor.py [--sem-nota]` | `SRxxx/dados/resultado.json`, `dados/*.out`, exports por face | `g1_TR_eta_K`, `g2_torques_vazao_balanco`, `g3_torque_vs_euler`; gráficos por ponto em `SRxxx/graficos`; `dados/desempenho.csv`; nota `05_Conversor/CT_V1_MRF.md` no Obsidian (imagens copiadas para `C_TG/img/`). Marca o ponto de acoplamento (TR = 1, SR ≈ 0,51). |
+| `euler_interfaces_conversor.py` | `python tools/euler_interfaces_conversor.py [SR em % ...] [--diag-vorticidade]` | Exports `_euler_<lado>.csv` e `_area.csv` por ponto | `g7_euler_interfaces`, `dados/euler_interfaces.csv` e `euler_interfaces_if.csv`. Balanço de momento angular por zona (convectivo com fluxo absoluto e relativo, difusivo, pressão) contra o torque das paredes; razão Euler/parede. |
+| `analise_yplus_conversor.py` | `python tools/analise_yplus_conversor.py` | `SRxxx/dados/SRxxx_parede_<peça>[_area].csv` | `g4_yplus_faixas`, `dados/yplus_faixas.csv`. Frações por faixa (< 5, 5–30, 30–300, 300–1000, > 1000), P50 e média; ponderado por área quando há `_area.csv`, senão por face (marcado com `*`). |
+| `analise_sensibilidade_conversor.py` | `python tools/analise_sensibilidade_conversor.py [--dir-sens P] [--saida P]` | Base `SR000` e `sens/<variante>/dados/resultado.json` | `g6_sensibilidade`, `dados/sensibilidade.csv`: Δ% de TR, T_b, T_t e K e \|Δ\|/U, com U = √(SEM_var² + SEM_base²) (SEM por batch means). Variante ausente é pulada. |
+| `comparacao_literatura_conversor.py` | `python tools/comparacao_literatura_conversor.py` | `dados/desempenho.csv`, `refs/conversor_literatura.csv` (fontes em `refs/conversor_literatura.md`) | `g5_comparacao_literatura` (TR, TR/TR_estol, η e K/K_estol × SR). Compara tendência, não valor: as geometrias são outras. |
+| `tendencia_derivada_conversor.py` | `python tools/tendencia_derivada_conversor.py` | `desempenho.csv`, `.out`, literatura | `g8_derivada_tendencia`, `dados/derivada_tendencia.csv`: diferença finita no ponto médio de cada intervalo de SR, com U = 2·SEM. |
+| `tendencia_sinais_conversor.py` | `python tools/tendencia_sinais_conversor.py` | idem | `g9_sinais_tendencia`, `dados/sinais_tendencia.csv`: cada intervalo é "confirmado", "sinal certo, dentro da incerteza" ou "sinal errado". |
+| `tendencia_colapso_conversor.py` | `python tools/tendencia_colapso_conversor.py` | idem | `g10_colapso_adimensional`, `dados/colapso_adimensional.csv` e `_resumo.csv`: (TR−1)/(TR_estol−1) × SR/SR_acopl e η/η_máx × SR/SR*, com PCHIP implementado no script (o `.venv241` não tem scipy). |
+| `animacao_meio_passo.py` | `python tools/animacao_meio_passo.py [--limiar 0.85] [--quadros 48] [--fps 12] [--teste]` | Faces de parede do `SR000` | `animacao_meio_passo.gif` e os PNGs de 0° e 10°. Conta as pás (bomba 20, turbina 18, estator 18) pela harmônica angular. |
+| `gci_conversor.py` | `python tools/gci_conversor.py [--n0 N --v0 V] [--p-formal 2] [--mc 0] [--teste]` | `resultado.json` e `.out` de SR000 e SR040 em `CT_V1_MRF`, `CT_V1_GCI_G1`, `CT_V1_GCI_G2`; N e V do transcript do solver | `CT_V1_GCI/dados/gci.csv`, `graficos/gci_tr.png`. Ver abaixo. |
+| `malha_gci_conversor.py` | `python tools/malha_gci_conversor.py G1 G2 [--so-superficie] [--retomar-superficie] [--partir-da-superficie] [--fator f]` | `.wft` da G0 e STLs | `mesh/CT_V1_3zonas_G{1,2}.msh.h5`, `CT_V1_GCI/logs/<nível>_parametros.json`. |
+| `imagens_malha_conversor.py` | `python tools/imagens_malha_conversor.py G2 [G1 G0] [--processos N]` ou `--so-montagem` | `mesh/CT_V1_3zonas[_G1\|_G2].msh.h5` | `CT_V1_GCI/graficos/malha_<nível>_NN_<vista>.png`, `malha_comparacao_<vista>.png`, `CT_V1_GCI/dados/malha_<nível>_info.json`. Recusa começar com menos de 3000 MB livres de RAM. |
+| `comparacao_blocos.py` | `python tools/comparacao_blocos.py [A B ... H]` | `_campo.csv`, `_parede_*.csv`, `_metricas.json`, `refs/` | `results/comparacao_blocos/bloco_{A..G}.png`, `bloco_H_duto.png`, `bloco_H_degrau.png`, `resumo.csv`. Rodadas não convergidas aparecem com `*`, hachura e linha tracejada. Sem referência, só mostra as rodadas. |
+
+### GCI (`gci_conversor.py`, `malha_gci_conversor.py`)
+
+- **Malhas.** G0 = 1 900 736 células e V = 8,576847e-2 m³ (h médio = (V/N)^(1/3) = 3,56 mm). G1 e G2 saem do mesmo
+  Fault-tolerant Meshing da G0, escalando os tamanhos por f (G1: 1,35; G2: 1,35² = 1,8225), a taxa de crescimento por
+  1 + 0,2·f (limite 1,34), o ângulo de curvatura por f e as células por folga por 1/f (limite 1,775). A calibração pela
+  contagem de faces da superfície deu r efetivo = 1,308 na G1 (842 090 faces contra 1 440 968 da G0); decidiu-se manter os
+  fatores nominais. O GCI usa o r medido (N e V reais do solver).
+- **Rodadas.** SR = 0 e SR = 0,4 em cada malha (`conversor_mrf.py varredura 1 0 0.4 --malha ... --saida ...`).
+- **Método (Celik et al., 2008).** p é a menor raiz das equações 3a–3c em [0,05; 20] (varredura + bisseção; o ponto
+  fixo do artigo falha com r32 ≫ r21); sem raiz ou fora de [0,5; 10], usa p formal e sinaliza; raiz acima de 1,1·p formal
+  é limitada ao formal (evita GCI otimista com ε no ruído). Com p aparente, a razão assintótica é |φ1/φ2| por construção e
+  não é usada como teste; se p estiver a ≥ 10 % do formal, a observação manda usar o GCI conservador. A coluna `GCI21_cons_pct`
+  usa Fs = 3 e p limitado quando \|p − p_f\|/p_f ≥ 10 %. O ruído iterativo entra pelo SEM por batch means (5 lotes de 40
+  iterações), com τ integral como conferência, e há Monte Carlo opcional (300 amostras). Marca a malha INVÁLIDA se
+  \|V/V0 − 1\| > 2 % ou se r se afastar mais de 15 % de 1,35 (saída com código 3). `GCI21_rel_Tb_pct` dá o GCI de T_e
+  como fração de |T_b|, pois T_e é pequeno e troca de sinal perto do acoplamento.
+- **Pendente.** O exemplo da Tabela 1 de Celik dá GCI21 = 2,17 % pelas fórmulas e o revisor lembra 2,09 % publicado:
+  o Murilo confere no artigo.
+- **Resultado (2026-11-22, revisado por um revisor independente).** SR 0: TR 1,065 / 1,062 / 1,069 (G0/G1/G2), GCI21
+  0,49 % com p formal, diferença no ruído iterativo. SR 0,4: torques caem ~5 % por nível (p 0,65, fora da faixa
+  assintótica; GCI de T_b 32 %, conservador 78 %); TR da G0 1,027 contra 1,015–1,016 em G1/G2. A suspeita era o
+  protocolo (só a G0 usou URF padrão e passou por SR 0,2).
+- **Testes de protocolo na G0 (2026-11-22).** Por causa da limitação do `--ini` (tabela dos comandos), os dois testes
+  partiram do zero direto em SR 0,4 com as URF reduzidas: `CT_V1_GCI_G0_urf_reinicio` e `CT_V1_GCI_G0_urf_direto`
+  deram o mesmo report file, byte a byte (TR 1,0288; T_b −18 578 N·m; T_t 19 112 N·m; 1 100 it); o Fluent em
+  paralelo é determinístico. Na G0, partir do zero em 0,4 ou passar por 0 → 0,2 → 0,4 com URF padrão dá TR 1,027–1,029
+  (T_b −18,6 a −18,8 kN·m, dentro de 1 σ), então o TR não depende do caminho nem da URF. A diferença para a G1/G2 é
+  **efeito de malha**, e o GCI de SR 0,4 vale como está. Em `CT_V1_GCI_G0_urf` (G0 partindo do zero em SR 0 com URF
+  reduzida) o `.dat` do SR 0 se perdeu com o C: cheio. A média das últimas 200 it, tirada do report file, deu TR 1,0691,
+  T_b −24 624 N·m e T_t 26 325 N·m, contra 1,0648, −24 668 e 26 268 da G0 original.
+
+### `monitor/` (fora do git)
+
+Servidor local somente leitura (`servidor.py`, biblioteca padrão, 127.0.0.1:8765), página `index.html` e
+`abrir_monitor.ps1`. Mostra processos do Fluent (e órfãos), scripts Python e filas, RAM, logs com o último it+ e alerta
+de log parado, resultados da varredura e da sensibilidade. Não inicia nem mata nada. Ver `monitor/README.md`.

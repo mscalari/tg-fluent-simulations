@@ -1,0 +1,149 @@
+{
+ "sr": 0.0,
+ "it_ini": 0,
+ "it_fim": 1000,
+ "convergiu": true,
+ "deriva_media": {
+  "t_bomba": 0.001631545095667002,
+  "t_turbina": 0.0030429158025947543,
+  "t_estator": 0.001374232929487275
+ },
+ "media_janela": {
+  "t_bomba": -25657.675537582127,
+  "t_turbina": 26471.58881607864,
+  "t_estator": -1258.604959756491,
+  "t_total": -444.6916812599788,
+  "m_bomba_turbina_bomba": -288.6342658911089,
+  "h_bomba_turbina_bomba": 0.0,
+  "m_bomba_turbina_turbina": 288.634265891109,
+  "h_bomba_turbina_turbina": 823.015693683819,
+  "m_turbina_estator_turbina": -288.64008135969203,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 288.6400813596921,
+  "h_turbina_estator_estator": 0.0,
+  "m_estator_bomba_estator": -288.641247962904,
+  "h_estator_bomba_estator": -18.46906645348681,
+  "m_estator_bomba_bomba": 288.641247962904,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "desvio_janela": {
+  "t_bomba": 4.684876957009078,
+  "t_turbina": 0.5554618079572955,
+  "t_estator": 0.8810847526934757,
+  "t_total": 4.012727777292883,
+  "m_bomba_turbina_bomba": 0.08325219297517064,
+  "h_bomba_turbina_bomba": 0.0,
+  "m_bomba_turbina_turbina": 0.08325219297515793,
+  "h_bomba_turbina_turbina": 1.4117983782769814,
+  "m_turbina_estator_turbina": 0.0782204242304093,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 0.07822042423044079,
+  "h_turbina_estator_estator": 0.0,
+  "m_estator_bomba_estator": 0.07252881552997284,
+  "h_estator_bomba_estator": 0.0026907197114275036,
+  "m_estator_bomba_bomba": 0.07252881552997331,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "janela": 200,
+ "tempo_s": 2181.2,
+ "reports": {
+  "t_bomba": -25657.675537582127,
+  "t_turbina": 26471.58881607864,
+  "t_estator": -1258.604959756491,
+  "t_total": -444.6916812599788,
+  "m_bomba_turbina_bomba": -288.6342658911089,
+  "h_bomba_turbina_bomba": 0.0,
+  "m_bomba_turbina_turbina": 288.634265891109,
+  "h_bomba_turbina_turbina": 823.015693683819,
+  "m_turbina_estator_turbina": -288.64008135969203,
+  "h_turbina_estator_turbina": 0.0,
+  "m_turbina_estator_estator": 288.6400813596921,
+  "h_turbina_estator_estator": 0.0,
+  "m_estator_bomba_estator": -288.641247962904,
+  "h_estator_bomba_estator": -18.46906645348681,
+  "m_estator_bomba_bomba": 288.641247962904,
+  "h_estator_bomba_bomba": 0.0
+ },
+ "setup": {
+  "variante": "fou",
+  "descricao": "primeira ordem (upwind) em momento e turbul\u00eancia; PRESTO! na press\u00e3o",
+  "momentos": {
+   "t_bomba": "Drag Force",
+   "t_turbina": "Drag Force",
+   "t_estator": "Drag Force",
+   "t_total": "Drag Force"
+  },
+  "viscous": {
+   "model": "k-omega",
+   "k_omega_model": "sst",
+   "k_omega_options": {
+    "kw_low_re_correction": false
+   },
+   "near_wall_treatment": {
+    "wall_omega_treatment": "correlation"
+   },
+   "transition_module": "none",
+   "options": {
+    "curvature_correction": true,
+    "corner_flow_correction": false,
+    "production_kato_launder_enabled": false,
+    "production_limiter": {
+     "enabled": true,
+     "clip_factor": 10.0
+    }
+   },
+   "turbulence_expert": {
+    "turb_non_newtonian": false,
+    "restore_sst_v61": false
+   },
+   "user_defined": {
+    "turb_visc_func": "none"
+   }
+  },
+  "methods": {
+   "p_v_coupling": {
+    "flow_scheme": "SIMPLE"
+   },
+   "flux_type": {
+    "pbns_cases": {
+     "flux_auto_select": true
+    }
+   },
+   "discretization_scheme": {
+    "k": "first-order-upwind",
+    "mom": "first-order-upwind",
+    "omega": "first-order-upwind",
+    "pressure": "presto!"
+   },
+   "pseudo_time_method": {
+    "formulation": {
+     "segregated_solver": "off"
+    }
+   },
+   "expert": {
+    "numerics_pbns": {
+     "implicit_bodyforce_treatment": false,
+     "velocity_formulation": "relative",
+     "physical_velocity_formulation": false,
+     "disable_rhie_chow_flux": false,
+     "presto_pressure_scheme": false,
+     "first_to_second_order_blending": 1.0
+    }
+   },
+   "gradient_scheme": "least-square-cell-based",
+   "high_order_term_relaxation": {
+    "enable": false
+   },
+   "warped_face_gradient_correction": {
+    "enable": true,
+    "mode": "fast"
+   }
+  }
+ },
+ "unidade_torque": "N\u00b7m",
+ "paredes_zona": {
+  "fluido_bomba": -26136.05836752506,
+  "fluido_turbina": 26917.01750311209,
+  "fluido_estator": -1227.608975277754
+ }
+}
