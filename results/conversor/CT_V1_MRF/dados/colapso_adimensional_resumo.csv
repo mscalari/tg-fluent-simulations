@@ -1,0 +1,25 @@
+painel;serie;origem;situacao;motivo;norm_x;norm_x_pchip;U95_norm_x;norm_y;indice_forma_A;forma_A;forma_d2;pontos_comparaveis;pontos_dentro;pontos_barra_toca;desvio_max_fora
+TR;CT_V1 MRF;cfd_rans_mrf;simulacao;"SR_acopl linear; PCHIP como verificação";0.506642;0.523476;0.0215527;1.06483;0.114078;côncava;côncava;2;0;1;0.163437
+TR;zhang2023 exp;exp;envelope;cruza TR = 1 (TR_estol em SR = 0,01);0.825;0.825539;;2.155;0.0216503;côncava;mista (5−/2+);;;;
+TR;zhang2023 cfd_rans (SST);cfd_rans;envelope;cruza TR = 1 (TR_estol em SR = 0,01);0.832432;0.83625;;2.065;0.00675517;quase linear;mista (5−/2+);;;;
+TR;zhang2023 cfd_les (WALE);cfd_les;envelope;cruza TR = 1 (TR_estol em SR = 0,01);0.830556;0.830265;;2.09;0.0165103;quase linear;mista (3−/4+);;;;
+TR;guo2021 exp;exp;tracejada_extrapolada;SR máx = 0,80 com TR = 1,080 > 1: SR_acopl extrapolado (2 últimos pontos);0.855172;;;2.175;0.00191816;quase linear;mista (4−/3+);;;;
+TR;guo2021 cfd_rans (sem cavitacao);cfd_rans;tracejada_extrapolada;SR máx = 0,80 com TR = 1,060 > 1: SR_acopl extrapolado (2 últimos pontos);0.8375;;;2.26;-0.000537469;quase linear;mista (4−/3+);;;;
+TR;guo2021 cfd_rans (com cavitacao Zwart);cfd_rans;tracejada_extrapolada;SR máx = 0,80 com TR = 1,060 > 1: SR_acopl extrapolado (2 últimos pontos);0.83871;;;2.175;0.0162942;quase linear;mista (5−/2+);;;;
+TR;ran2021 exp;exp;tracejada_extrapolada;SR máx = 0,80 com TR = 1,020 > 1: SR_acopl extrapolado (2 últimos pontos);0.8125;;;2.4;-0.0216399;convexa;mista (3−/4+);;;;
+TR;ran2021 cfd_rans (Cavi);cfd_rans;tracejada_extrapolada;SR máx = 0,80 com TR = 1,045 > 1: SR_acopl extrapolado (2 últimos pontos);0.828125;;;2.48;-0.0210959;convexa;mista (4−/3+);;;;
+TR;ran2021 cfd_rans (NOC);cfd_rans;tracejada_extrapolada;SR máx = 0,80 com TR = 1,040 > 1: SR_acopl extrapolado (2 últimos pontos);0.824242;;;2.57;-0.033206;convexa;mista (3−/4+);;;;
+TR;nadeem2020 exp;exp;envelope;cruza TR = 1 (TR_estol em SR = 0,00);0.9186;0.91826;;1.849;0.00534837;quase linear;mista (6−/10+);;;;
+TR;kotwicki_forma_nadeem2020 modelo;modelo;fora;"forma de Kotwicki ajustada por Nadeem (não é medição; sem estol)";;;;;;;;;;;
+eta;CT_V1 MRF;cfd_rans_mrf;simulacao;eta cresce até SR=0,9: normalizado pelo último ponto (limite);0.897922;;;0.761118;0.0617558;côncava;mista (4−/1+);8;0;0;0.0740074
+eta;zhang2023 exp;exp;envelope;máximo interior;0.722881;;;0.851544;0.137871;côncava;côncava;;;;
+eta;zhang2023 cfd_rans (SST);cfd_rans;envelope;máximo interior;0.769868;;;0.851428;0.138805;côncava;côncava;;;;
+eta;zhang2023 cfd_les (WALE);cfd_les;envelope;máximo interior (η = SR·TR);0.725258;;;0.871094;0.112425;côncava;côncava;;;;
+eta;guo2021 exp;exp;fora;máximo no último ponto (SR = 0,80): η_máx não delimitado;0.8;;;0.864;0.169198;côncava;côncava;;;;
+eta;guo2021 cfd_rans (sem cavitacao);cfd_rans;envelope;máximo interior;0.734211;;;0.856224;0.151049;côncava;côncava;;;;
+eta;guo2021 cfd_rans (com cavitacao Zwart);cfd_rans;envelope;máximo interior;0.742647;;;0.853592;0.152488;côncava;côncava;;;;
+eta;ran2021 exp;exp;envelope;máximo interior;0.727273;;;0.827636;0.169012;côncava;côncava;;;;
+eta;ran2021 cfd_rans (Cavi);cfd_rans;envelope;máximo interior;0.728571;;;0.844929;0.17544;côncava;côncava;;;;
+eta;ran2021 cfd_rans (NOC);cfd_rans;envelope;máximo interior;0.722619;;;0.844574;0.174948;côncava;côncava;;;;
+eta;nadeem2020 exp;exp;fora;η cresce até o fim (passa ao modo acoplamento): sem máximo interior;0.9495;;;0.9419;0.138078;côncava;mista (13−/7+);;;;
+eta;kotwicki_forma_nadeem2020 modelo;modelo;fora;"forma de Kotwicki ajustada por Nadeem (não é medição; sem estol)";;;;;;;;;;;

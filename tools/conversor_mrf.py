@@ -6,8 +6,10 @@ Uso (rodar com PYTHONIOENCODING=utf-8 e o .venv241):
     python tools/conversor_mrf.py varredura S [SRs] [--ini X.dat.h5]
                                                       S = +1 ou -1; SRs opcionais (padrão SRS); --ini: partida do 1º ponto
     opções globais (qualquer comando): --malha <arquivo .msh.h5> --saida <pasta em results/conversor>
-    python tools/conversor_mrf.py sensibilidade [sst_sem_cc ke_realizable fou meio_passo]
-                                                      variantes do setup no estol (DIR/sens/<variante>)
+                                      --urf mom=0.5,k=0.6,omega=0.6,turb-viscosity=0.8 (sub-relaxação menor)
+    python tools/conversor_mrf.py sensibilidade [sst_sem_cc ke_realizable fou meio_passo coupled]
+                                                      variantes do setup no estol (DIR/sens/<variante>);
+                                                      coupled só numa malha grossa (--malha ... --saida ...)
     python tools/conversor_mrf.py refazer_figuras [SRs]
                                                       relê o .cas/.dat de cada ponto e refaz as imagens do Fluent
                                                       (na varredura elas saem em branco, só com a legenda)
@@ -44,6 +46,8 @@ JANELA = 200                    # janela da estabilidade dos torques
 TOL = 0.005                     # variação relativa máxima na janela (0,5 %)
 ITER_MIN = {"primeiro": 1000, "demais": 600}
 ITER_MAX = {"primeiro": 3000, "demais": 2000}   # ~4,5 s/iteração com SIMPLE: 3,75 h e 2,5 h no pior caso
+T_DIVERGE = 1.0e6               # N·m; acima disso o ponto é dado como divergente (G0: |T| < 2,7e4)
+URF = {}                        # sub-relaxação extra (--urf mom=0.5,k=0.6,...); vazio = padrão do Fluent
 
 ZONAS = ("fluido_bomba", "fluido_turbina", "fluido_estator")
 PECA = {"fluido_bomba": "bomba", "fluido_turbina": "turbina", "fluido_estator": "estator"}
@@ -55,6 +59,8 @@ PARES = {  # interface: (lado da 1ª zona, lado da 2ª zona)
 # Paredes que pertencem a uma peça mas tocam o fluido de outra zona (gira com a peça dona, referencial absoluto).
 PAREDES_ABS = {"parede_bomba_lado_turbina": "bomba", "parede_bomba_lado_estator": "bomba",
                "parede_estator_lado_turbina": "estator", "parede_estator_lado_bomba": "estator"}
+PAREDES_ABS_G0 = dict(PAREDES_ABS)   # as da G0; PAREDES_ABS é refeita pelas paredes de cada malha/caso
+STL_PECA = {"1": "bomba", "2": "estator", "3": "turbina"}   # sufixo .n das zonas stlb_* (ordem dos STLs no .wft)
 
 
 def log(*a):
@@ -381,8 +387,103 @@ def reports(s, st, grupos, sinal):
     return nomes
 
 
+def normalizar_zonas(st):
+    """Tira o sufixo numérico das cell zones e das zonas interior (``fluido_turbina_18`` -> ``fluido_turbina``).
+
+    O ``/mesh/manage/merge "fluido_<peça>*"`` do Meshing mantém o nome de uma das zonas juntadas; na G0 saiu o
+    nome-base, nas malhas do GCI saiu ``_18``. Nomes descobertos na sessão viva (sonda de 2026-11-21 na G1):
+    ``cell_zone_conditions.fluid.rename(novo, velho)``; ``boundary_conditions.set_zone_name`` serve às
+    interior, mas não às fluid ("api-rename-obj: Object is invalid").
+
+    Args:
+        st: Raiz ``session.settings`` com a malha lida.
+
+    Returns:
+        dict[str, str]: Nome antigo -> nome novo (vazio se já estava certo).
+
+    Raises:
+        RuntimeError: Se alguma zona de ``ZONAS`` continuar ausente.
+    """
+    feito = {}
+    fl = st.setup.cell_zone_conditions.fluid
+    for velho in list(fl.keys()):
+        novo = re.sub(r"_\d+$", "", velho)
+        if novo != velho and novo in ZONAS and novo not in fl.keys():
+            fl.rename(novo, velho)
+            feito[velho] = novo
+    bc = st.setup.boundary_conditions
+    for velho in list(bc.interior.keys()):
+        novo = re.sub(r"_\d+$", "", velho)
+        if novo != velho and velho.startswith("interior--") and novo not in bc.interior.keys():
+            bc.set_zone_name(zonename=velho, newname=novo)
+            feito[velho] = novo
+    faltam = [z for z in ZONAS if z not in fl.keys()]
+    if faltam:
+        raise RuntimeError(f"cell zones ausentes depois de normalizar: {faltam}")
+    if feito:
+        log("zonas renomeadas:", feito)
+    return feito
+
+
+def renomear_paredes_stl(st):
+    """Dá nome de parede-lado às zonas ``stlb_*.<n>:fluido_<lado>_<k>`` que o Meshing não juntou.
+
+    Na G2 sobraram faces da casca da turbina (``.3``) encostadas no fluido do estator (5 e 4 faces), um caso que
+    a G0 não tinha. Cada zona vira ``parede_<dono>_lado_<lado>`` (ou ``parede_<dono>_<k>_lado_<lado>`` se o nome
+    já existir), para girar com a peça dona e entrar no torque dela como as demais paredes-lado.
+
+    Args:
+        st: Raiz ``session.settings`` com a malha lida.
+
+    Returns:
+        dict[str, str]: Nome antigo -> nome novo.
+    """
+    bc = st.setup.boundary_conditions
+    feito = {}
+    for w in sorted(bc.wall.keys()):
+        m = re.search(r"stlb_.*?\.(\d)\W*fluido_([a-z]+)", w)
+        if not m:
+            continue
+        dono, lado = STL_PECA[m.group(1)], m.group(2)
+        novo, k = f"parede_{dono}_lado_{lado}", 1
+        while novo in bc.wall.keys():
+            k += 1
+            novo = f"parede_{dono}_{k}_lado_{lado}"
+        bc.set_zone_name(zonename=w, newname=novo)
+        feito[w] = novo
+    if feito:
+        log("paredes stlb_* renomeadas:", feito)
+    return feito
+
+
+def sincronizar_paredes_abs(st):
+    """Refaz ``PAREDES_ABS`` (parede-lado -> peça dona) a partir das paredes existentes na sessão.
+
+    Vale para a malha lida em ``montar`` e para casos relidos (sensibilidade, figuras), cujas malhas do GCI
+    podem ter perdido paredes pequenas ou ganhado paredes novas (``renomear_paredes_stl``).
+
+    Args:
+        st: Raiz ``session.settings``.
+
+    Returns:
+        dict[str, str]: O novo ``PAREDES_ABS``.
+    """
+    global PAREDES_ABS
+    novo = {}
+    for w in st.setup.boundary_conditions.wall.keys():
+        m = re.fullmatch(r"parede_([a-z]+)(?:_\d+)?_lado_([a-z]+)", w)
+        if m:
+            novo[w] = m.group(1)
+    PAREDES_ABS = novo
+    return novo
+
+
 def montar(s, sinal):
     """Monta o setup MRF completo e inicializa.
+
+    Com ``GIRO_TURBINA`` ≠ 0 (variante ``meio_passo``), gira a zona da turbina em torno de x logo depois
+    de ler a malha, antes de criar as interfaces. Nomes de zona com sufixo numérico (malhas do GCI) são
+    normalizados por ``normalizar_zonas`` logo depois da leitura.
 
     Args:
         s (ansys.fluent.core.session_solver.Solver): Sessão recém-aberta.
@@ -394,14 +495,18 @@ def montar(s, sinal):
     global PAREDES_ABS
     st = s.settings
     st.file.read_mesh(file_name=str(MALHA))
-    st.mesh.check()
     ef = {"malha": MALHA.name, "sinal": sinal, "rpm_b": RPM_B, "omega_b": OMEGA_B}
+    ef["zonas_renomeadas"] = normalizar_zonas(st)
+    if GIRO_TURBINA:                # variante meio_passo: posição relativa das rodas (frozen rotor)
+        ef["giro_turbina"] = {"graus": GIRO_TURBINA, "via": girar_turbina(s, GIRO_TURBINA)}
+    st.mesh.check()
+    ef["paredes_stl_renomeadas"] = renomear_paredes_stl(st)
     existentes = set(st.setup.boundary_conditions.wall.keys())
-    ausentes = [z for z in PAREDES_ABS if z not in existentes]
+    ausentes = [z for z in PAREDES_ABS_G0 if z not in existentes]
     if ausentes:                    # malhas grossas do GCI podem perder zonas pequenas (62 faces na G0)
         log("ATENÇÃO: paredes ausentes nesta malha:", ausentes)
-        PAREDES_ABS = {z: d for z, d in PAREDES_ABS.items() if z in existentes}
     ef["paredes_abs_ausentes"] = ausentes
+    ef["paredes_abs"] = sincronizar_paredes_abs(st)
     ef.update(criar_interfaces(st))
     adj = adjacencia(st, list(PAREDES_ABS))
     ef["adjacencia_paredes_lado"] = adj
@@ -435,6 +540,15 @@ def montar(s, sinal):
     # Coupled precisa de ~17,6 GB nesta malha (16 GB de RAM: swap, 15 s/iteração). TG 4.4: o Coupled vale
     # "quando a memória disponível o permite"; a família SIMPLE é a alternativa mais leve. URFs padrão (TG 2.8).
     m.p_v_coupling.flow_scheme = "SIMPLE"
+    if URF:                         # malhas do GCI: URF menor só estabiliza; não muda a solução convergida
+        u = st.solution.controls.under_relaxation
+        disponiveis = list(u.keys())
+        for k, x in URF.items():
+            if k in disponiveis:
+                u[k] = x
+            else:
+                log(f"ATENÇÃO: URF '{k}' não existe (disponíveis: {disponiveis})")
+        log("URF aplicada:", u())
     m.gradient_scheme = "least-square-cell-based"
     m.discretization_scheme["pressure"] = "presto!"
     for k in m.discretization_scheme.keys():
@@ -476,8 +590,10 @@ def camera(st, direita, cima):
 
 VISTAS = {  # nome: (órbita para a direita, órbita para cima) em graus, a partir da vista frontal (+z)
     "meridional": (0.0, 0.0),
-    "de_menos_x": (-90.0, 0.0),
-    "de_mais_x": (90.0, 0.0),
+    # orbit(right=-90) leva a câmera para +x e orbit(right=+90) para −x (conferido nas imagens do SR000:
+    # a bomba fica em x < 0 e mostra a face aberta, virada para +x, na vista "de_mais_x")
+    "de_mais_x": (-90.0, 0.0),
+    "de_menos_x": (90.0, 0.0),
     "iso": (35.0, 25.0),
     "de_mais_y": (0.0, 90.0),
 }
@@ -713,6 +829,29 @@ def ler_tabela(arquivo):
     return nomes, linhas
 
 
+def divergiu(u, col, rotulo, feito):
+    """Interrompe o ponto se os torques mostrarem divergência (para não iterar lixo até o teto).
+
+    Critérios: algum torque não finito ou acima de ``T_DIVERGE`` N·m (40× o maior torque da G0), ou, depois de
+    2 blocos, desbalanço |soma| > 50 % de |T_b| (a G0 fica abaixo de 2 %). Na G1 de 2026-11-21 o SR000 passou
+    de soma ≈ 1 % para 100 % de |T_b| entre as iterações 900 e 1000 e explodiu (10⁷³) depois.
+
+    Args:
+        u (list[float]): Última linha do report file.
+        col (dict[str, int]): Nome do report -> coluna.
+        rotulo (str): Texto do log.
+        feito (int): Iterações já feitas no ponto.
+
+    Raises:
+        RuntimeError: Se algum critério de divergência for atingido.
+    """
+    tb, tt, te, tot = (u[col[n]] for n in ("t_bomba", "t_turbina", "t_estator", "t_total"))
+    if not all(math.isfinite(x) and abs(x) < T_DIVERGE for x in (tb, tt, te, tot)):
+        raise RuntimeError(f"{rotulo}: divergiu em it+{feito} (torques {tb:.3g}, {tt:.3g}, {te:.3g})")
+    if feito >= 2 * BLOCO and abs(tot) > 0.5 * abs(tb):
+        raise RuntimeError(f"{rotulo}: divergindo em it+{feito} (desbalanço {tot:.3g} contra T_b {tb:.3g})")
+
+
 def iterar_ponto(s, sr, primeiro, rotulo, n_min=None):
     """Itera um ponto de operação até a estabilidade dos torques ou o teto.
 
@@ -727,7 +866,8 @@ def iterar_ponto(s, sr, primeiro, rotulo, n_min=None):
         dict: Iteração inicial e final, convergência, variações, tempo de parede.
 
     Raises:
-        RuntimeError: Se um bloco de iterações não acrescentar linhas ao report file.
+        RuntimeError: Se um bloco de iterações não acrescentar linhas ao report file, ou se ``divergiu``
+            detectar divergência.
     """
     st = s.settings
     arq = DIR / "dados" / REP
@@ -759,6 +899,7 @@ def iterar_ponto(s, sr, primeiro, rotulo, n_min=None):
         u = linhas[-1]
         log(f"{rotulo} it+{feito}: T_b={u[col['t_bomba']]:.4g} T_t={u[col['t_turbina']]:.4g} "
             f"T_e={u[col['t_estator']]:.4g} soma={u[col['t_total']]:.3g} var={ {k: f'{x:.2e}' for k, x in var.items()} }")
+        divergiu(u, col, rotulo, feito)
         if ok or feito >= ITER_MAX[chave]:
             break
     med, dp = media_janela(arq, n0)
@@ -906,7 +1047,7 @@ def figuras(st, p, sufixo, grupos):
               g / f"{sufixo}_2{j}_{s_}_vetores_vrel.png", pulo=1)
     for j, s_ in enumerate(sup["cortes"]):
         for campo, rot in (("pressure", "pressao"), ("rel-velocity-magnitude", "vrel")):
-            tenta(f"3{j}_{s_}_{rot}", contorno, st, "c_corte", campo, [s_], "de_mais_x", g / f"{sufixo}_3{j}_{s_}_{rot}.png")
+            tenta(f"3{j}_{s_}_{rot}", contorno, st, "c_corte", campo, [s_], "de_menos_x", g / f"{sufixo}_3{j}_{s_}_{rot}.png")
     for peca, zs in grupos.items():
         base = [f"parede_{peca}"]
         for campo, rot in (("pressure", "pressao"), ("wall-shear", "tau_w"), ("y-plus", "yplus")):
@@ -916,7 +1057,7 @@ def figuras(st, p, sufixo, grupos):
     for z in [z for v in PARES.values() for z in v]:
         for campo, rot in (("axial-velocity", "v_axial"), ("tangential-velocity", "v_tangencial"),
                            ("radial-velocity", "v_radial")):
-            vista = "de_mais_x" if "bomba_turbina" in z else "iso"
+            vista = "de_menos_x" if "bomba_turbina" in z else "iso"
             tenta(f"5_{z}_{rot}", contorno, st, "c_if", campo, [z], vista, g / f"{sufixo}_5_{z}_{rot}.png")
     # linhas de corrente a partir da saída da bomba
     try:
@@ -928,7 +1069,7 @@ def figuras(st, p, sufixo, grupos):
         pl["pl_bt"].skip = 40
         pl["pl_bt"].step = 4000
         pl["pl_bt"].display()
-        for vista in ("iso", "de_mais_x", "meridional"):
+        for vista in ("iso", "de_menos_x", "meridional"):
             camera(st, *VISTAS[vista])
             res[f"6_pathlines_{vista}"] = salvar(st, g / f"{sufixo}_6_pathlines_{vista}.png")
     except Exception as e:
@@ -1124,11 +1265,13 @@ def cmd_figuras_teste(nome_caso):
 
 
 PAS = {"bomba": 20, "turbina": 18, "estator": 18}   # contadas pela harmônica angular das faces de parede
+GIRO_TURBINA = 0.0   # graus; ≠ 0 só na variante meio_passo (aplicado em montar, antes das interfaces)
 VARIANTES = {  # nome: descrição (todas no SR = 0; as de modelo e esquema partem da solução do SR000)
     "sst_sem_cc": "k-ω SST sem correção de curvatura",
     "ke_realizable": "k-ε Realizable com funções de parede",
     "fou": "primeira ordem (upwind) em momento e turbulência; PRESTO! na pressão",
     "meio_passo": "turbina girada de meio passo (10°) em relação à bomba e ao estator; setup refeito da malha",
+    "coupled": "acoplamento pressão-velocidade Coupled no lugar do SIMPLE (rodar numa malha grossa: na G0 não cabe)",
 }
 
 
@@ -1167,15 +1310,17 @@ def cmd_sensibilidade(variante):
 
     As variantes de modelo e esquema relêem o ``.cas/.dat`` do SR000, mudam só o item em estudo e iteram
     pelo mesmo critério da varredura (mínimo de 2 janelas). ``meio_passo`` refaz o setup da malha com a
-    turbina girada e parte do repouso, como o SR000.
+    turbina girada e parte do repouso, como o SR000. ``coupled`` troca o SIMPLE pelo Coupled (nome tirado de
+    ``flow_scheme.allowed_values()``); só cabe na RAM numa malha grossa do GCI.
 
     Args:
         variante (str): Chave de ``VARIANTES``.
 
     Raises:
         KeyError: Variante desconhecida.
+        StopIteration: Se ``flow_scheme`` não oferecer a opção ``Coupled``.
     """
-    global MALHA, REP
+    global GIRO_TURBINA, REP
     desc = VARIANTES[variante]
     # Report file próprio: se o arquivo já tem linhas além da iteração atual (variante anterior), o Fluent
     # não o sobrescreve e cria "<nome>_<it+1>.out", e o laço ficaria lendo o arquivo antigo para sempre.
@@ -1188,17 +1333,17 @@ def cmd_sensibilidade(variante):
         st = s.settings
         ef = {"variante": variante, "descricao": desc}
         if variante == "meio_passo":
-            st.file.read_mesh(file_name=str(MALHA))
-            ef["rotacao_turbina"] = {"graus": 180.0 / PAS["turbina"], "via": girar_turbina(s, 180.0 / PAS["turbina"])}
-            st.file.write_mesh(file_name=str(p / "fluent" / "CT_V1_3zonas_meio_passo.msh.h5"))
-            malha_orig, MALHA = MALHA, p / "fluent" / "CT_V1_3zonas_meio_passo.msh.h5"
+            # A 24.1 não tem file.write_mesh nos settings: a turbina é girada dentro de montar, logo
+            # depois de ler a malha e antes de criar as interfaces.
+            GIRO_TURBINA = 180.0 / PAS["turbina"]
             try:
-                ef.update(montar(s, +1))       # relê a malha girada e monta tudo de novo
+                ef.update(montar(s, +1))
             finally:
-                MALHA = malha_orig
+                GIRO_TURBINA = 0.0
             primeiro, n_min = True, None
         else:
             st.file.read_case_data(file_name=str(DIR / "SR000" / "fluent" / "CT_V1_MRF_SR000.cas.h5"))
+            ef["paredes_abs"] = sincronizar_paredes_abs(st)
             st.solution.monitor.report_files["mon"].file_name = f"../dados/{REP}"
             ef["momentos"] = corrigir_momentos(st)
             v = st.setup.models.viscous
@@ -1212,6 +1357,11 @@ def cmd_sensibilidade(variante):
                 opcoes = list(wt.allowed_values())
                 ef["wall_treatment_opcoes"] = opcoes
                 wt.set_state(next((o for o in opcoes if "scalable" in o), "standard-wall-fn"))
+            elif variante == "coupled":
+                fs = m.p_v_coupling.flow_scheme
+                opcoes = list(fs.allowed_values())
+                ef["flow_scheme_opcoes"] = opcoes
+                fs.set_state(next(o for o in opcoes if o.lower() == "coupled"))
             elif variante == "fou":
                 for k in m.discretization_scheme.keys():
                     if k != "pressure":
@@ -1351,7 +1501,8 @@ def cmd_refazer_figuras(srs):
                 continue
             try:
                 st.file.read_case_data(file_name=str(caso))
-                if ef is None:                     # sem setup.json: tira sobras e grupos do próprio caso
+                sincronizar_paredes_abs(st)
+                if ef is None:                    # sem setup.json: tira sobras e grupos do próprio caso
                     ef = setup_do_caso(st)
                     arq_setup.write_text(json.dumps(ef, indent=1, default=str))
                     log("setup.json reconstruído do caso:", json.dumps(ef["sobras"]))
@@ -1378,7 +1529,10 @@ def cmd_refazer_figuras(srs):
 
 
 def opcoes_globais(argv):
-    """Retira ``--malha <arquivo>`` e ``--saida <pasta>`` da linha de comando e ajusta ``MALHA`` e ``DIR``.
+    """Retira ``--malha``, ``--saida`` e ``--urf`` da linha de comando e ajusta ``MALHA``, ``DIR`` e ``URF``.
+
+    ``--urf mom=0.5,k=0.6,omega=0.6,turb-viscosity=0.8`` baixa a sub-relaxação (aplicada em ``montar``); foi
+    preciso na G1, que divergiu com as URFs padrão.
 
     Serve às malhas do GCI: ``--malha mesh/CT_V1_3zonas_G1.msh.h5 --saida CT_V1_GCI_G1`` grava em
     ``results/conversor/CT_V1_GCI_G1`` sem tocar nos resultados da malha base.
@@ -1389,18 +1543,20 @@ def opcoes_globais(argv):
     Returns:
         list[str]: Argumentos restantes.
     """
-    global MALHA, DIR
+    global MALHA, DIR, URF
     argv = list(argv)
-    for opc in ("--malha", "--saida"):
+    for opc in ("--malha", "--saida", "--urf"):
         if opc in argv:
             k = argv.index(opc)
             valor = argv[k + 1]
             del argv[k:k + 2]
             if opc == "--malha":
                 MALHA = (ROOT / valor) if not Path(valor).is_absolute() else Path(valor)
-            else:
+            elif opc == "--saida":
                 DIR = ROOT / "results" / "conversor" / valor
-    log("MALHA =", MALHA, "| DIR =", DIR)
+            else:
+                URF = {par.split("=")[0]: float(par.split("=")[1]) for par in valor.split(",")}
+    log("MALHA =", MALHA, "| DIR =", DIR, "| URF =", URF or "padrão")
     return argv
 
 

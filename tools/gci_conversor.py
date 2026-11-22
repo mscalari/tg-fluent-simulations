@@ -197,6 +197,9 @@ def tipo_convergencia(e21, e32, p_raiz):
 def ordem_aparente(p_raiz, tipo, p_formal=2.0):
     """Decide o p a usar: a raiz, se válida, ou a ordem formal com o motivo.
 
+    A raiz mais de 10 % acima da ordem formal é limitada a ela (conservador): com ε pequeno ou no ruído
+    iterativo, um p aparente grande dá um GCI otimista sem respaldo no esquema de 2ª ordem.
+
     Args:
         p_raiz (float): Raiz de ``raiz_p`` (``nan`` se não houver).
         tipo (str): Saída de ``tipo_convergencia``.
@@ -211,6 +214,8 @@ def ordem_aparente(p_raiz, tipo, p_formal=2.0):
         return p_formal, "sem raiz"
     if not P_MIN <= p_raiz <= P_MAX:
         return p_formal, "p fora de [0,5;10] (aparente %.3g)" % p_raiz
+    if p_raiz > 1.1 * p_formal:                 # mesma tolerância de 10 % do Fs conservador
+        return p_formal, "p aparente %.3g > formal: limitado ao formal" % p_raiz
     return p_raiz, "aparente"
 
 
@@ -705,7 +710,12 @@ def calcular_grandeza(g, sr, pts, malhas, tb1, p_formal, n_mc, problemas, avisos
     if c["tipo"] in ("divergente", "oscilatória divergente"):
         obs.append(f"{c['tipo']}: GCI só de referência (p formal); sem φ_ext")
     ra = c["razao_assintotica"]
-    if np.isfinite(ra) and phi2 != 0 and not 0.8 <= ra / abs(phi1 / phi2) <= 1.2:
+    if c["p_origem"] == "aparente":   # p ajustado aos 3 pontos: a razão sai igual a |φ1/φ2| por construção
+        obs.append("razão assintótica = |φ1/φ2| por construção (p aparente): não testa a faixa assintótica")
+        if abs(c["p"] - p_formal) / p_formal >= 0.1 and np.isfinite(c["GCI21_cons"]):
+            obs.append("p aparente %.2f longe do formal %g: use o GCI conservador (Fs = %g) = %.3g %%"
+                       % (c["p"], p_formal, c["Fs_cons"], 100 * c["GCI21_cons"]))
+    elif np.isfinite(ra) and phi2 != 0 and not 0.8 <= ra / abs(phi1 / phi2) <= 1.2:
         obs.append("razão assintótica %.2f longe de |φ1/φ2| = %.2f: fora da faixa assintótica" % (ra, abs(phi1 / phi2)))
     rel_tb = NAN
     if g in ("T_b", "T_t", "T_e") and np.isfinite(c["GCI21"]):
@@ -894,7 +904,7 @@ def autoteste():
     for p_ver, ext, C, hs in casos:
         phi = [ext + C * h ** p_ver for h in hs]
         r21, r32 = hs[1] / hs[0], hs[2] / hs[1]
-        c = celik(*phi, r21, r32)
+        c = celik(*phi, r21, r32, p_formal=max(2.0, p_ver))   # p_formal ≥ p_ver: testa só a raiz
         oks.append(confere(f"sintético p={p_ver}, r21={r21:.2f}, r32={r32:.2f}: monotônica, recupera p e φ_ext",
                            abs(c["p"] - p_ver) < 1e-6 and abs(c["phi_ext21"] - ext) < 1e-6
                            and c["p_origem"] == "aparente" and c["tipo"] == "monotônica",
@@ -904,6 +914,10 @@ def autoteste():
                            abs(c["GCI21"] - e_abs / abs(phi[0])) < 1e-12
                            and abs(c["razao_assintotica"] / abs(phi[0] / phi[1]) - 1) < 1e-6,
                            f"(GCI21={100 * c['GCI21']:.4f} %, razão={c['razao_assintotica']:.4f})"))
+    phi = [30.0 + 0.7 * h ** 2.5 for h in (1.0, 1.3, 2.08)]
+    c = celik(*phi, 1.3, 2.08 / 1.3)
+    oks.append(confere("p aparente 2,5 > 1,1·p_formal (2): limitado ao formal",
+                       c["p"] == 2.0 and c["p_origem"].startswith("p aparente"), f"(p={c['p']}, {c['p_origem']})"))
     r21, r32 = math.sqrt(18000 / 8000), math.sqrt(8000 / 4500)       # Celik 2008, Tab. 1 (2D)
     f1, f2, f3 = 6.063, 5.972, 5.863
     c = celik(f1, f2, f3, r21, r32)
