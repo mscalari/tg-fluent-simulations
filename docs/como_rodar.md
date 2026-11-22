@@ -217,6 +217,8 @@ python tools/conversor_mrf.py setup                          # monta o caso e te
 python tools/conversor_mrf.py sentido 500                    # SR = 0 em +x e −x (escolhido: +x)
 python tools/conversor_mrf.py varredura 1                    # SR 0 … 0,9, cada ponto parte do anterior
 python tools/conversor_mrf.py varredura 1 0.9 0.95 1.0 --ini results/conversor/CT_V1_MRF/SR090/fluent/<...>.dat.h5
+# atenção: o --ini não carrega o .dat de outra sessão (o setup altera a malha); o 1º ponto parte do zero
+# ("The mesh has been modified. Previously saved data files are incompatible"). Procure essa frase no log.
 python tools/conversor_mrf.py sensibilidade                  # sst_sem_cc ke_realizable fou meio_passo
 python tools/conversor_mrf.py sensibilidade coupled --malha mesh/CT_V1_3zonas_G2.msh.h5 --saida CT_V1_GCI_G2
 python tools/conversor_mrf.py refazer_figuras 0 0.2          # uma sessão por chamada; use poucos SR por vez
@@ -256,7 +258,12 @@ mostra sempre `rc=0` (aconteceu na fila 6; confira o resultado pelo log do passo
 encheu e o Fluent caiu no `write_case_data` (HDF5-DIAG, "Connection reset"), perdendo o resultado da G1. Os casos que
 as filas não usam mais foram movidos (não apagados) para `D:\TG_backup_fluent\CT_V1_MRF\` com a mesma estrutura
 (`robocopy ... *.cas.h5 *.dat.h5 /MOV`); `--ini` aceita o caminho no D:. As filas conferem o espaço livre antes de cada
-passo e pulam o passo com menos de 3 GB.
+passo e pulam o passo com menos de 8 GB. Até a fila 10, esse teste nunca pulava nada: o PowerShell devolve o número com
+vírgula decimal ("3,5") e o `awk` não comparava; agora o valor passa por `tr ',' '.'`. O C: encheu duas vezes na G0
+porque o `pagefile.sys` cresce quando a RAM (16 GB) aperta: foi de 20,6 para 26,2 GB com o Fluent (~6,6 GB) e o Chrome
+(~3,5 GB) abertos. Rode a G0 com pelo menos 8 GB livres no C: e o mínimo de programas abertos.
+Em 22/11/2026, os CSVs fora do git, as malhas `.msh.h5`, os logs e os `.trn` foram movidos para `D:\TG_backup_drive`
+(veja o `LEIAME.md` de lá). Para rodar de novo, traga a malha de volta para `mesh/`.
 
 Entre passos da fila, confira e limpe `fluent.exe`/`cx2410.exe`/`fl_mpi2410.exe` órfãos pela árvore de PIDs da
 sessão, nunca por nome.
