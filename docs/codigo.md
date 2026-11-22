@@ -260,7 +260,7 @@ guarda as da G0) e `divergiu` (guarda de divergência chamada a cada bloco em `i
 |---|---|
 | `setup` | Monta o caso, testa imagens e grava `CT_V1_MRF_setup.cas.h5`. |
 | `sentido [N]` | SR = 0, N iterações em cada sentido do eixo (+x e −x). Escolhido: +x (TR > 1 e estator reagindo). |
-| `varredura S [SRs] [--ini X.dat.h5]` | S = +1 ou −1; SRs padrão: 0; 0,2; 0,4; 0,6; 0,7; 0,8; 0,85; 0,9. Cada ponto parte do anterior; `--ini` dá a partida do 1º. Grava `resultado.json` por ponto. |
+| `varredura S [SRs] [--ini X.dat.h5]` | S = +1 ou −1; SRs padrão: 0; 0,2; 0,4; 0,6; 0,7; 0,8; 0,85; 0,9. Cada ponto parte do anterior; `--ini` dá a partida do 1º. Grava `resultado.json` por ponto. **Limitação:** o `read_data` de um `.dat` gravado por outra sessão falha sem exceção ("The mesh has been modified. Previously saved data files are incompatible and cannot be read."), porque o setup altera a malha (interfaces e renomeação de zonas); o 1º ponto então parte da inicialização standard. Os pontos seguintes, na mesma sessão, partem do anterior normalmente. |
 | `sensibilidade [variantes]` | Variantes no SR = 0, em `<saída>/sens/<variante>`: `sst_sem_cc`, `ke_realizable` (funções de parede *scalable*), `fou` (1ª ordem em momento e turbulência), `meio_passo` (gira a zona da turbina 10° com `mesh.modify_zones.rotate_zone`, antes de criar as interfaces, e parte do repouso) e `coupled` (só em malha grossa, por RAM). Cada variante usa o seu próprio report file. |
 | `refazer_figuras [SRs]` | Relê o `.cas/.dat` de cada ponto numa sessão nova e refaz as imagens, a verificação Cm → N·m, o torque das paredes `sobra_*` e os exports Euler (os dois lados de cada interface). |
 | `figuras_teste <caso>` | Gera as imagens de um caso gravado (diagnóstico). |
@@ -342,9 +342,16 @@ TR = −T_t/T_b, η = SR·TR, K = n_b/√|T_b| (n_b em rpm).
   o Murilo confere no artigo.
 - **Resultado (2026-11-22, revisado por um revisor independente).** SR 0: TR 1,065 / 1,062 / 1,069 (G0/G1/G2), GCI21
   0,49 % com p formal, diferença no ruído iterativo. SR 0,4: torques caem ~5 % por nível (p 0,65, fora da faixa
-  assintótica; GCI de T_b 32 %, conservador 78 %); TR da G0 1,027 contra 1,015–1,016 em G1/G2, confundido com o protocolo
-  (só a G0 usou URF padrão e passou por SR 0,2). Testes para separar: `CT_V1_GCI_G0_urf_reinicio` (G0 SR 0,4 reiniciado
-  com URF reduzida) e `CT_V1_GCI_G0_urf` (G0 SR 0 → 0,4 direto com URF reduzida).
+  assintótica; GCI de T_b 32 %, conservador 78 %); TR da G0 1,027 contra 1,015–1,016 em G1/G2. A suspeita era o
+  protocolo (só a G0 usou URF padrão e passou por SR 0,2).
+- **Testes de protocolo na G0 (2026-11-22).** Por causa da limitação do `--ini` (tabela dos comandos), os dois testes
+  partiram do zero direto em SR 0,4 com as URF reduzidas: `CT_V1_GCI_G0_urf_reinicio` e `CT_V1_GCI_G0_urf_direto`
+  deram o mesmo report file, byte a byte (TR 1,0288; T_b −18 578 N·m; T_t 19 112 N·m; 1 100 it); o Fluent em
+  paralelo é determinístico. Na G0, partir do zero em 0,4 ou passar por 0 → 0,2 → 0,4 com URF padrão dá TR 1,027–1,029
+  (T_b −18,6 a −18,8 kN·m, dentro de 1 σ), então o TR não depende do caminho nem da URF. A diferença para a G1/G2 é
+  **efeito de malha**, e o GCI de SR 0,4 vale como está. Em `CT_V1_GCI_G0_urf` (G0 partindo do zero em SR 0 com URF
+  reduzida) o `.dat` do SR 0 se perdeu com o C: cheio. A média das últimas 200 it, tirada do report file, deu TR 1,0691,
+  T_b −24 624 N·m e T_t 26 325 N·m, contra 1,0648, −24 668 e 26 268 da G0 original.
 
 ### `monitor/` (fora do git)
 

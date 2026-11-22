@@ -134,8 +134,10 @@ superfície da G1 deu r efetivo = 1,308 (842 090 faces contra 1 440 968 da G0). 
 da média por batch means (p aparente acima de 1,1·p formal é limitado ao formal). A G1 e a G2 rodaram com URF
 menores (`--urf`). Resultado (22/11/2026): em SR 0 o TR não depende da malha dentro do ruído iterativo (1,065 / 1,062 /
 1,069; GCI21 0,49 %); em SR 0,4 os torques absolutos caem ~5 % por nível, fora da faixa assintótica, e o TR da G0
-(1,027) difere do da G1/G2 (1,015–1,016), diferença confundida com o protocolo (URF e caminho de SR). Os testes
-`CT_V1_GCI_G0_urf_reinicio` e `CT_V1_GCI_G0_urf` separam essas causas. Os `.cas/.dat` antigos da G0 estão em
+(1,027) difere do da G1/G2 (1,015–1,016). A G0 partindo do zero direto em SR 0,4 com as URF reduzidas da G1/G2
+(`CT_V1_GCI_G0_urf_reinicio`) dá TR 1,029, então a diferença é efeito de malha, não de URF nem de caminho de SR.
+Atenção: na G0, o `--ini` não carrega o `.dat` de outra sessão ("The mesh has been modified... cannot be read") e o
+ponto parte do zero (veja `docs/como_rodar.md`, seção 7.1). Os `.cas/.dat` antigos da G0 estão em
 `D:\TG_backup_fluent\CT_V1_MRF\` (o C: encheu).
 
 ### Monitor local
