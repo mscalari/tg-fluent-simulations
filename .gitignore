@@ -10,10 +10,9 @@ logs/
 # Interface local de monitoramento (somente leitura)
 monitor/
 
-# Conversor (MRF): malhas, casos do Fluent e exports por face ficam fora (GB); só o .wft das malhas entra
+# Conversor (MRF): geometria, malhas (inclusive os .wft do workflow), casos do Fluent e exports por face ficam fora
 mesh/*.msh.h5
-mesh/*_workflow_files/*
-!mesh/*_workflow_files/*.wft
+mesh/CT_V1*/
 results/conversor/**/fluent/
 results/conversor/**/*.h5
 results/conversor/**/SR*/dados/*.csv
