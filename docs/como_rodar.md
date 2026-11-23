@@ -302,7 +302,7 @@ results/comparacao_blocos/              figuras-resumo de R01–R43 e resumo.csv
 ```
 
 `.cas/.dat`, `.h5` e os exports por face (`SR*/dados/*.csv`) ficam fora do git (GB). O `.gitignore` também exclui
-`monitor/`, as malhas `mesh/*.msh.h5` e os `*_workflow_files` (exceto o `.wft`).
+`monitor/`, as malhas `mesh/*.msh.h5` e as pastas `mesh/CT_V1*/` (geometria e malha do conversor, inclusive o `.wft`).
 
 ### 7.4 Lições do Fluent 24.1 sem GUI
 
